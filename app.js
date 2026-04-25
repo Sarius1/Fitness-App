@@ -7,6 +7,7 @@ const SK = {
   NUTRITION: 'ft_nut', GOALS: 'ft_goals', PLANS: 'ft_plans',
   HISTORY: 'ft_hist', RUNS: 'ft_runs', SETTINGS: 'ft_settings',
   ACTIVE_WO: 'ft_active_wo', CUSTOM_EX: 'ft_custom_ex',
+  SPLITS: 'ft_splits', ACTIVE_SPLIT: 'ft_active_split',
 };
 const DEFAULT_GOALS = { calories: 2500, protein: 150, carbs: 300, fat: 70 };
 const GROUP_COLORS = {
@@ -99,6 +100,9 @@ const state = {
   pickerPlanColor: PLAN_COLORS[0],
   pickerPlanName: '',
   pickerPlanFreq: '2',
+  editSplitDays: [],
+  editSplitId: null,
+  editSplitName: '',
   timerInterval: null,
   analyticsGymExercise: '',
   exPickerGroup: 'All',
@@ -259,8 +263,12 @@ function renderNutrition() {
     const ppct = goals.protein  > 0 ? Math.min((tot.protein /goals.protein) *100, 120) : 0;
     const cc = barHex(barColor(goals.calories>0?(tot.calories/goals.calories)*100:0));
     const pc = '#8b5cf6';
+    const sd = getSplitDayForDate(ds);
+    const sdCol = sd ? splitDayColor(sd) : null;
+    const sdBadge = sd ? `<div class="cal-split-badge" style="background:${sdCol}22;color:${sdCol}">${esc(sd.label)}</div>` : '';
     cells += `<div class="cal-day${ds===t?' today':''}" onclick="openDayView('${ds}')">
       <div class="cal-day-num">${d}</div>
+      ${sdBadge}
       <div class="cal-mini-bars">
         <div class="cal-mini-bar"><div class="cal-mini-bar-fill" style="width:${has?cpct:0}%;background:${cc}"></div></div>
         <div class="cal-mini-bar"><div class="cal-mini-bar-fill" style="width:${has?ppct:0}%;background:${pc}"></div></div>
@@ -302,9 +310,20 @@ function changeNutritionMonth(dir) {
 }
 
 function openDayView(dateStr) {
-  const foods = (getNutritionData()[dateStr]?.foods) || [];
+  const dayData = getNutritionData()[dateStr] || {};
+  const foods = dayData.foods || [];
   const goals = getGoals();
   const tot = getDayTotals(dateStr);
+  const bwVal = dayData.weight || '';
+  const sd = getSplitDayForDate(dateStr);
+  const sdCol = sd ? splitDayColor(sd) : null;
+  const splitBanner = sd ? `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:${sdCol}18;border-radius:12px;margin-bottom:10px;border:1px solid ${sdCol}44">
+    <span style="font-size:20px">${sd.type==='rest'?'😴':sd.type==='run'?'🏃':'🏋️'}</span>
+    <div>
+      <div style="font-weight:700;font-size:14px;color:${sdCol}">${esc(sd.label)}</div>
+      <div style="font-size:11px;color:var(--text2)">Planned ${sd.type==='plan'?'workout':sd.type}</div>
+    </div>
+  </div>` : '';
 
   const macroBoxes = ['calories','protein','carbs','fat'].map(k => {
     const unit = k === 'calories' ? 'kcal' : 'g';
@@ -351,6 +370,19 @@ function openDayView(dateStr) {
       <button class="panel-action" onclick="openAddFoodModal('${dateStr}')">+ Add</button>
     </div>
     <div class="panel-body">
+      ${splitBanner}
+      <div class="card" style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="flex:1">
+            <div class="card-title" style="margin-bottom:0">Body Weight</div>
+          </div>
+          <input class="input" id="bw_input" type="number" inputmode="decimal" step="0.1"
+            placeholder="—" value="${bwVal}"
+            style="width:88px;text-align:right;font-size:17px;font-weight:700;padding:8px 10px">
+          <span style="color:var(--text2);font-size:13px;font-weight:500">kg</span>
+          <button class="btn btn-primary btn-sm" onclick="saveBodyWeight('${dateStr}')">Save</button>
+        </div>
+      </div>
       <div class="macros-grid">${macroBoxes}</div>
       <div class="card">${bars}</div>
       <div class="card">
@@ -416,6 +448,16 @@ function deleteFood(dateStr, foodId) {
   openDayView(dateStr);
 }
 
+function saveBodyWeight(dateStr) {
+  const val = parseFloat(document.getElementById('bw_input')?.value);
+  const data = getNutritionData();
+  if (!data[dateStr]) data[dateStr] = { foods: [] };
+  if (val > 0) data[dateStr].weight = val;
+  else delete data[dateStr].weight;
+  save(SK.NUTRITION, data);
+  showToast(val > 0 ? `${val} kg saved!` : 'Weight cleared');
+}
+
 function openGoalsModal() {
   const g = getGoals();
   openOverlay(`
@@ -443,19 +485,22 @@ function saveGoals() {
 /* ═══════════════════════════════════════════════════════════
    WORKOUTS
 ═══════════════════════════════════════════════════════════ */
-const getPlans   = () => load(SK.PLANS,   []);
-const getHistory = () => load(SK.HISTORY, []);
-const getRuns    = () => load(SK.RUNS,    []);
+const getPlans       = () => load(SK.PLANS,        []);
+const getHistory     = () => load(SK.HISTORY,      []);
+const getRuns        = () => load(SK.RUNS,          []);
+const getSplits      = () => load(SK.SPLITS,        []);
+const getActiveSplit = () => load(SK.ACTIVE_SPLIT,  null);
 const getAllExercises = () => [...EXERCISE_DB, ...load(SK.CUSTOM_EX, [])];
 
 function renderWorkouts() {
   const el = document.getElementById('tab-workouts');
   const sub = state.workoutSubTab;
-  const tabs = ['plans','history','running'].map(t =>
+  const tabs = ['plans','splits','history','running'].map(t =>
     `<button class="sub-tab${sub===t?' active':''}" onclick="switchWorkoutSub('${t}')">${t.charAt(0).toUpperCase()+t.slice(1)}</button>`
   ).join('');
   el.innerHTML = `<div class="sub-tabs">${tabs}</div><div id="wo-sub"></div>`;
   if (sub === 'plans') renderPlans();
+  else if (sub === 'splits') renderSplits();
   else if (sub === 'history') renderHistory();
   else renderRunningList();
 }
@@ -1092,6 +1137,233 @@ function deleteRun(id) {
   closeOverlay(); renderRunningList(); showToast('Run deleted');
 }
 
+/* ── Splits ─────────────────────────────────────────────── */
+function splitDayColor(day) {
+  if (!day) return '#888';
+  if (day.type === 'rest') return '#6b7280';
+  if (day.type === 'run')  return '#22c55e';
+  const plan = getPlans().find(p => p.id === day.planId);
+  return plan?.color || '#8b5cf6';
+}
+
+function getSplitDayForDate(dateStr) {
+  const as = getActiveSplit(); if (!as) return null;
+  const split = getSplits().find(s => s.id === as.splitId); if (!split?.days.length) return null;
+  const d0 = parseDate(as.startDate), d1 = parseDate(dateStr);
+  const diff = Math.round((d1 - d0) / 86400000);
+  if (diff < 0) return null;
+  return split.days[diff % split.days.length] || null;
+}
+
+function renderSplits() {
+  const splits = getSplits();
+  const as = getActiveSplit();
+  const el = document.getElementById('wo-sub');
+
+  let activeBanner = '';
+  if (as) {
+    const split = splits.find(s => s.id === as.splitId);
+    if (split) {
+      const todayDay = getSplitDayForDate(todayStr());
+      const diff = Math.round((parseDate(todayStr()) - parseDate(as.startDate)) / 86400000);
+      const cycleDay = diff >= 0 ? (diff % split.days.length) + 1 : '—';
+      activeBanner = `<div class="card" style="border-color:var(--accent);background:var(--accent-glow);margin-bottom:10px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+          <div>
+            <div style="font-weight:700;color:var(--accent)">${esc(split.name)}</div>
+            <div style="font-size:12px;color:var(--text2)">Day ${cycleDay}/${split.days.length} · Today: <b style="color:var(--text)">${esc(todayDay?.label||'—')}</b></div>
+          </div>
+          <button class="btn btn-sm btn-secondary" onclick="deactivateSplit()">Stop</button>
+        </div>
+      </div>`;
+    }
+  }
+
+  if (!splits.length) {
+    el.innerHTML = activeBanner + `<div class="empty-state">
+      <div class="empty-icon">📅</div>
+      <div class="empty-title">No splits yet</div>
+      <div class="empty-sub">Create a repeating schedule — Push, Run, Rest, Pull… shown in the nutrition calendar.</div>
+      <button class="btn btn-primary" onclick="openNewSplit()">+ Create Split</button>
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = activeBanner + splits.map(s => {
+    const isActive = as?.splitId === s.id;
+    const pills = s.days.map(d => {
+      const col = splitDayColor(d);
+      return `<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;background:${col}22;color:${col}">${esc(d.label)}</span>`;
+    }).join('');
+    return `<div class="plan-card">
+      <div class="plan-card-header">
+        <div class="plan-color-dot" style="background:${isActive?'var(--accent)':'var(--border)'}"></div>
+        <span class="plan-card-name">${esc(s.name)}</span>
+        <span class="plan-card-freq">${s.days.length}d cycle</span>
+      </div>
+      <div class="plan-card-body">
+        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px">${pills}</div>
+        <div class="plan-actions">
+          ${isActive
+            ? `<button class="btn btn-secondary btn-sm" style="flex:1" onclick="activateSplit('${s.id}')">↺ Reset Start</button>`
+            : `<button class="btn btn-primary btn-sm" style="flex:1" onclick="activateSplit('${s.id}')">▶ Activate</button>`
+          }
+          <button class="btn btn-secondary btn-sm" onclick="openEditSplit('${s.id}')">Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteSplit('${s.id}')">✕</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('') + `<button class="btn btn-secondary btn-full mt-8" onclick="openNewSplit()">+ New Split</button>`;
+}
+
+function openNewSplit() {
+  state.editSplitId = null;
+  state.editSplitDays = [];
+  state.editSplitName = '';
+  renderSplitEditor();
+}
+
+function openEditSplit(splitId) {
+  const split = getSplits().find(s => s.id === splitId); if (!split) return;
+  state.editSplitId = splitId;
+  state.editSplitDays = split.days.map(d => ({...d}));
+  state.editSplitName = split.name;
+  renderSplitEditor();
+}
+
+function renderSplitEditor() {
+  const isEdit = !!state.editSplitId;
+  const plans = getPlans();
+
+  const daysList = state.editSplitDays.length
+    ? state.editSplitDays.map((d, i) => {
+        const col = splitDayColor(d);
+        const icon = d.type === 'run' ? '🏃' : d.type === 'rest' ? '😴' : '🏋️';
+        return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
+          <div style="width:30px;height:30px;border-radius:8px;background:${col}22;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">${icon}</div>
+          <div style="flex:1">
+            <div style="font-weight:600;font-size:14px">${esc(d.label)}</div>
+            <div style="font-size:11px;color:var(--text2)">${d.type==='plan'?'Workout Plan':d.type==='run'?'Run Day':'Rest Day'}</div>
+          </div>
+          <button class="icon-btn" style="color:var(--text3)" onclick="removeSplitDay(${i})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>`;
+      }).join('')
+    : `<div style="color:var(--text2);font-size:13px;padding:12px 0;text-align:center">No days yet — add some below</div>`;
+
+  const planBtns = plans.map(p =>
+    `<button class="btn btn-secondary" style="justify-content:flex-start;gap:10px" onclick="addSplitDay('plan','${p.id}')">
+      <div style="width:10px;height:10px;border-radius:50%;background:${p.color||'var(--accent)'};flex-shrink:0"></div>
+      ${esc(p.name)}
+    </button>`
+  ).join('');
+
+  openPanel(`
+    <div class="panel-header">
+      <button class="panel-back" onclick="closePanel();renderSplits()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="20" height="20"><polyline points="15 18 9 12 15 6"/></svg>
+        Cancel
+      </button>
+      <span class="panel-title">${isEdit ? 'Edit Split' : 'New Split'}</span>
+      <button class="panel-action" onclick="saveSplit()">Save</button>
+    </div>
+    <div class="panel-body">
+      <div class="input-group">
+        <label class="input-label">Split Name</label>
+        <input class="input" id="sp_name" type="text" placeholder="e.g. Push / Run / Rest"
+          value="${esc(state.editSplitName)}" oninput="state.editSplitName=this.value">
+      </div>
+      <div style="margin-bottom:4px">
+        <div class="card-title">${state.editSplitDays.length}-Day Cycle</div>
+        ${daysList}
+      </div>
+      <div class="divider" style="margin:14px 0"></div>
+      <div class="card-title" style="margin-bottom:8px">Add Day</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${planBtns || '<div style="color:var(--text2);font-size:13px;padding:4px 0">No workout plans yet — create plans first</div>'}
+        <button class="btn btn-secondary" style="justify-content:flex-start;gap:10px" onclick="addSplitDay('run','')">
+          <span style="font-size:16px">🏃</span> Run Day
+        </button>
+        <button class="btn btn-secondary" style="justify-content:flex-start;gap:10px" onclick="addSplitDay('rest','')">
+          <span style="font-size:16px">😴</span> Rest Day
+        </button>
+      </div>
+    </div>`);
+}
+
+function addSplitDay(type, planId) {
+  state.editSplitName = document.getElementById('sp_name')?.value ?? state.editSplitName;
+  const label = type === 'rest' ? 'Rest'
+    : type === 'run'  ? 'Run'
+    : (getPlans().find(p => p.id === planId)?.name || 'Workout');
+  state.editSplitDays.push({ type, planId: planId||'', label });
+  renderSplitEditor();
+}
+
+function removeSplitDay(i) {
+  state.editSplitName = document.getElementById('sp_name')?.value ?? state.editSplitName;
+  state.editSplitDays.splice(i, 1);
+  renderSplitEditor();
+}
+
+function saveSplit() {
+  const name = (document.getElementById('sp_name')?.value || state.editSplitName || '').trim();
+  if (!name) { showToast('Enter a split name'); return; }
+  if (!state.editSplitDays.length) { showToast('Add at least one day'); return; }
+  const splits = getSplits();
+  if (state.editSplitId) {
+    const idx = splits.findIndex(s => s.id === state.editSplitId);
+    if (idx >= 0) splits[idx] = { ...splits[idx], name, days: [...state.editSplitDays] };
+  } else {
+    splits.push({ id: uid(), name, days: [...state.editSplitDays] });
+  }
+  save(SK.SPLITS, splits);
+  state.editSplitName = '';
+  closePanel();
+  renderSplits();
+  showToast(state.editSplitId ? 'Split updated!' : 'Split created!');
+}
+
+function activateSplit(splitId) {
+  const split = getSplits().find(s => s.id === splitId); if (!split) return;
+  openOverlay(`
+    <p style="color:var(--text2);font-size:13px;margin-bottom:14px">
+      Which date should be <b>Day 1</b> of "<b>${esc(split.name)}</b>"?
+    </p>
+    <div class="input-group">
+      <label class="input-label">Start Date (Day 1)</label>
+      <input class="input" id="sp_start" type="date" value="${todayStr()}">
+    </div>
+    <button class="btn btn-primary btn-full mt-8" onclick="confirmActivateSplit('${splitId}')">Activate</button>
+  `, 'Activate Split');
+}
+
+function confirmActivateSplit(splitId) {
+  const startDate = document.getElementById('sp_start')?.value || todayStr();
+  save(SK.ACTIVE_SPLIT, { splitId, startDate });
+  closeOverlay();
+  renderSplits();
+  renderNutrition();
+  showToast('Split activated!');
+}
+
+function deactivateSplit() {
+  save(SK.ACTIVE_SPLIT, null);
+  renderSplits();
+  renderNutrition();
+  showToast('Split deactivated');
+}
+
+function deleteSplit(splitId) {
+  if (!confirm('Delete this split?')) return;
+  const as = getActiveSplit();
+  if (as?.splitId === splitId) save(SK.ACTIVE_SPLIT, null);
+  save(SK.SPLITS, getSplits().filter(s => s.id !== splitId));
+  renderSplits();
+  showToast('Split deleted');
+}
+
 /* ═══════════════════════════════════════════════════════════
    ANALYTICS
 ═══════════════════════════════════════════════════════════ */
@@ -1131,6 +1403,12 @@ function renderAnalytics() {
       <div class="chart-wrap"><canvas id="c_pro" height="160"></canvas></div>
     </div>
 
+    <div class="section-hd mt-8"><span class="section-title">Body Weight</span></div>
+    <div class="chart-card">
+      <div class="chart-title">Weight — Last 30 Days (kg)</div>
+      <div class="chart-wrap"><canvas id="c_weight" height="160"></canvas></div>
+    </div>
+
     <div class="section-hd mt-8"><span class="section-title">Gym Progress</span></div>
     <div class="chart-card">
       <div class="input-group" style="margin-bottom:10px">
@@ -1158,7 +1436,7 @@ function renderAnalytics() {
       <div class="chart-wrap"><canvas id="c_run_intervals" height="140"></canvas></div>
     </div>` : ''}` ;
 
-  requestAnimationFrame(() => { drawNutCharts(); drawGymCharts(); drawRunCharts(); });
+  requestAnimationFrame(() => { drawNutCharts(); drawWeightChart(); drawGymCharts(); drawRunCharts(); });
 }
 
 function drawNutCharts() {
@@ -1167,6 +1445,15 @@ function drawNutCharts() {
   const goals = getGoals();
   const cal = document.getElementById('c_cal'); if (cal) drawBar(cal, labels, days.map(d=>getDayTotals(d).calories), { color:'#8b5cf6', goalLine:goals.calories });
   const pro = document.getElementById('c_pro'); if (pro) drawBar(pro, labels, days.map(d=>getDayTotals(d).protein),  { color:'#3b82f6', goalLine:goals.protein });
+}
+
+function drawWeightChart() {
+  const days = getLast30Days();
+  const data = getNutritionData();
+  const labels = days.map(d => { const dt=parseDate(d); return `${dt.getMonth()+1}/${dt.getDate()}`; });
+  const weights = days.map(d => data[d]?.weight ? parseFloat(data[d].weight) : null);
+  const wc = document.getElementById('c_weight');
+  if (wc) drawLine(wc, labels, [{ values: weights, color: '#8b5cf6' }]);
 }
 
 function drawGymCharts() {
