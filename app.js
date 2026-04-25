@@ -1684,7 +1684,7 @@ function openMuscleMap() {
           auto-rotate-delay="0"
           camera-orbit="0deg 90deg auto"
           camera-target="auto"
-          field-of-view="70deg"
+          field-of-view="110deg"
           style="width:100%;height:100%;background:transparent;--progress-bar-color:var(--accent);touch-action:none;cursor:pointer"
           loading="eager"
         ></model-viewer>
@@ -1901,7 +1901,7 @@ function renderAnalytics() {
           auto-rotate-delay="0"
           camera-orbit="0deg 90deg auto"
           camera-target="auto"
-          field-of-view="70deg"
+          field-of-view="110deg"
           style="width:100%;height:100%;background:transparent;--progress-bar-color:var(--accent);touch-action:none;cursor:pointer"
           loading="eager"
         ></model-viewer>
