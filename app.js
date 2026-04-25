@@ -918,12 +918,18 @@ function fmtTimeHMS(sec) {
 }
 // Auto-format time input: user types digits only, colons inserted automatically
 function onTimeKey(el) {
-  const cursor = el.selectionStart;
   let digits = el.value.replace(/\D/g,'').slice(0,6);
   let formatted = digits;
   if (digits.length > 4) formatted = digits.slice(0,2)+':'+digits.slice(2,4)+':'+digits.slice(4);
   else if (digits.length > 2) formatted = digits.slice(0,2)+':'+digits.slice(2);
   el.value = formatted;
+}
+// On blur: pad with leading zeros to always produce hh:mm:ss
+function onTimeBlur(el) {
+  let digits = el.value.replace(/\D/g,'');
+  if (!digits) return;
+  digits = digits.padStart(6, '0').slice(0, 6);
+  el.value = digits.slice(0,2)+':'+digits.slice(2,4)+':'+digits.slice(4);
 }
 
 function renderRunningList() {
@@ -980,7 +986,7 @@ function runFormHTML(r = {}) {
       <div class="input-group">
         <label class="input-label">Total Time (hh:mm:ss — type digits only)</label>
         <input class="input" id="r_time" type="text" inputmode="numeric" placeholder="00:25:30"
-          value="${r.time?fmtTimeHMS(r.time):''}" oninput="onTimeKey(this)">
+          value="${r.time?fmtTimeHMS(r.time):''}" oninput="onTimeKey(this)" onblur="onTimeBlur(this)">
       </div>
     </div>
     <div id="r_interval_fields" style="display:${isInt?'block':'none'}">
@@ -989,12 +995,12 @@ function runFormHTML(r = {}) {
         <div class="input-group">
           <label class="input-label">Work Time (hh:mm:ss)</label>
           <input class="input" id="r_worktime" type="text" inputmode="numeric" placeholder="00:01:00"
-            value="${r.workTime?fmtTimeHMS(r.workTime):''}" oninput="onTimeKey(this)">
+            value="${r.workTime?fmtTimeHMS(r.workTime):''}" oninput="onTimeKey(this)" onblur="onTimeBlur(this)">
         </div>
         <div class="input-group">
           <label class="input-label">Rest Time (hh:mm:ss)</label>
           <input class="input" id="r_resttime" type="text" inputmode="numeric" placeholder="00:00:30"
-            value="${r.restTime?fmtTimeHMS(r.restTime):''}" oninput="onTimeKey(this)">
+            value="${r.restTime?fmtTimeHMS(r.restTime):''}" oninput="onTimeKey(this)" onblur="onTimeBlur(this)">
         </div>
       </div>
     </div>
