@@ -1559,17 +1559,7 @@ function bodyModelSVG(view, status) {
 
 function openMuscleMap() {
   const status = getMuscleTrainingStatus();
-  const MUSCLE_GROUPS = ['Chest','Back','Shoulders','Biceps','Triceps','Core','Legs'];
-  const chips = MUSCLE_GROUPS.map(g => {
-    const d = status[g];
-    const color = d === undefined ? '#ef4444' : d <= 7 ? '#22c55e' : d <= 14 ? '#f59e0b' : '#ef4444';
-    const label = d === undefined ? 'Not trained' : d === 0 ? 'Today' : `${d}d ago`;
-    return `<div style="display:flex;align-items:center;gap:6px;background:var(--card);border-radius:10px;padding:7px 12px;font-size:13px">
-      <span style="width:10px;height:10px;border-radius:50%;background:${color};flex-shrink:0"></span>
-      <span style="font-weight:600;color:var(--text1)">${g}</span>
-      <span style="color:var(--text3);font-size:11px;margin-left:auto">${label}</span>
-    </div>`;
-  }).join('');
+  state.muscleStatus = status;
 
   openPanel(`
     <div class="panel-header">
@@ -1581,22 +1571,23 @@ function openMuscleMap() {
       <span></span>
     </div>
     <div class="panel-body" style="padding:0;display:flex;flex-direction:column;overflow:hidden;height:100%">
-      <div style="display:flex;gap:8px;padding:8px 12px 6px;flex-wrap:wrap;justify-content:center;font-size:11px">
+      <div style="display:flex;gap:12px;padding:8px 16px 4px;justify-content:center;font-size:11px;color:var(--text3)">
         <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-right:4px;vertical-align:middle"></span>This week</span>
         <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f59e0b;margin-right:4px;vertical-align:middle"></span>8–14 days</span>
         <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ef4444;margin-right:4px;vertical-align:middle"></span>Not trained</span>
       </div>
-      <model-viewer
-        id="muscleModelViewer"
-        src="male_base_mesh_with_muscle_detail.glb"
-        camera-orbit="0deg 90deg auto"
-        camera-target="auto"
-        field-of-view="45deg"
-        style="width:100%;flex:1;min-height:0;background:transparent;--progress-bar-color:var(--accent);touch-action:none"
-        loading="eager"
-      ></model-viewer>
-      <div style="padding:10px 12px 16px;display:grid;grid-template-columns:1fr 1fr;gap:6px">
-        ${chips}
+      <div id="modelWrap" style="position:relative;flex:1;min-height:0;overflow:hidden">
+        <model-viewer
+          id="muscleModelViewer"
+          src="male_base_mesh_with_muscle_detail.glb"
+          camera-orbit="0deg 90deg auto"
+          camera-target="auto"
+          field-of-view="45deg"
+          style="width:100%;height:100%;background:transparent;--progress-bar-color:var(--accent);touch-action:none"
+          loading="eager"
+        ></model-viewer>
+        <div id="muscleOverlay" style="position:absolute;inset:0;pointer-events:none"></div>
+        <div id="musclePopup" style="position:absolute;bottom:0;left:0;right:0;background:var(--surface);border-radius:16px 16px 0 0;padding:16px 16px 24px;display:none;max-height:55%;overflow-y:auto;box-shadow:0 -4px 24px rgba(0,0,0,.4)"></div>
       </div>
     </div>`);
   requestAnimationFrame(initMuscleViewer);
@@ -1604,14 +1595,79 @@ function openMuscleMap() {
 
 function initMuscleViewer() {
   const mv = document.getElementById('muscleModelViewer');
-  if (!mv) return;
-  let startX = 0, startTheta = 0, dragging = false;
+  const overlay = document.getElementById('muscleOverlay');
+  if (!mv || !overlay) return;
 
-  const getTheta = () => {
-    try { const o = mv.getCameraOrbit(); return o ? o.theta * 180 / Math.PI : 0; }
-    catch { return 0; }
+  const status = state.muscleStatus || {};
+  // [group, x%, y%, side]  side: front | back | both
+  const LABEL_DEFS = [
+    ['Chest',     48, 30, 'front'],
+    ['Shoulders', 22, 20, 'front'],
+    ['Biceps',    10, 38, 'front'],
+    ['Core',      48, 45, 'front'],
+    ['Legs',      48, 65, 'both' ],
+    ['Back',      48, 30, 'back' ],
+    ['Triceps',   10, 38, 'back' ],
+  ];
+
+  const muscleColor = g => {
+    const d = status[g];
+    return d === undefined ? '#ef4444' : d <= 7 ? '#22c55e' : d <= 14 ? '#f59e0b' : '#ef4444';
   };
-  const setOrbit = theta => { mv.cameraOrbit = `${theta}deg 90deg auto`; };
+
+  // Build label buttons
+  const labelEls = LABEL_DEFS.map(([group, x, y, side]) => {
+    const col = muscleColor(group);
+    const btn = document.createElement('button');
+    btn.dataset.group = group;
+    btn.dataset.side = side;
+    btn.style.cssText = [
+      'position:absolute',
+      `left:${x}%`,`top:${y}%`,
+      'transform:translate(-50%,-50%)',
+      `background:${col}cc`,
+      'color:#fff',
+      `border:1.5px solid ${col}`,
+      'border-radius:20px',
+      'padding:4px 11px',
+      'font-size:11px',
+      'font-weight:700',
+      'letter-spacing:.05em',
+      'cursor:pointer',
+      'pointer-events:auto',
+      'backdrop-filter:blur(6px)',
+      '-webkit-backdrop-filter:blur(6px)',
+      'text-shadow:0 1px 3px rgba(0,0,0,.6)',
+      'white-space:nowrap',
+      'transition:opacity .15s',
+      'line-height:1.4',
+    ].join(';');
+    btn.textContent = group.toUpperCase();
+    btn.addEventListener('click', e => { e.stopPropagation(); showMusclePopup(group); });
+    overlay.appendChild(btn);
+    return btn;
+  });
+
+  let currentTheta = 0;
+  const updateLabels = theta => {
+    currentTheta = theta;
+    const rad = (((theta % 360) + 360) % 360) * Math.PI / 180;
+    const fc = Math.cos(rad); // +1=front facing, -1=back facing
+    labelEls.forEach(el => {
+      const side = el.dataset.side;
+      const op = side === 'both' ? 1 : side === 'front' ? Math.max(0, fc) : Math.max(0, -fc);
+      el.style.opacity = op;
+      el.style.pointerEvents = op > 0.25 ? 'auto' : 'none';
+    });
+  };
+  updateLabels(0);
+
+  let startX = 0, startTheta = 0, dragging = false;
+  const getTheta = () => {
+    try { const o = mv.getCameraOrbit(); return o ? o.theta * 180 / Math.PI : currentTheta; }
+    catch { return currentTheta; }
+  };
+  const setOrbit = theta => { mv.cameraOrbit = `${theta}deg 90deg auto`; updateLabels(theta); };
 
   mv.addEventListener('touchstart', e => {
     startX = e.touches[0].clientX; startTheta = getTheta(); dragging = true;
@@ -1622,17 +1678,52 @@ function initMuscleViewer() {
     setOrbit(startTheta - (e.touches[0].clientX - startX) * 0.4);
   }, { passive: false });
   mv.addEventListener('touchend', () => { dragging = false; });
-
   mv.addEventListener('mousedown', e => {
     startX = e.clientX; startTheta = getTheta(); dragging = true;
     e.preventDefault();
     const onMove = ev => { if (dragging) setOrbit(startTheta - (ev.clientX - startX) * 0.4); };
     document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', () => {
-      dragging = false;
-      document.removeEventListener('mousemove', onMove);
-    }, { once: true });
+    document.addEventListener('mouseup', () => { dragging = false; document.removeEventListener('mousemove', onMove); }, { once: true });
   });
+}
+
+function showMusclePopup(group) {
+  const popup = document.getElementById('musclePopup');
+  if (!popup) return;
+  const status = state.muscleStatus || {};
+  const d = status[group];
+  const col = d === undefined ? '#ef4444' : d <= 7 ? '#22c55e' : d <= 14 ? '#f59e0b' : '#ef4444';
+  const lastStr = d === undefined ? 'Never trained' : d === 0 ? 'Trained today' : `Last trained ${d} day${d===1?'':'s'} ago`;
+  const exercises = getAllExercises().filter(e => e.group === group);
+
+  popup.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="width:11px;height:11px;border-radius:50%;background:${col};flex-shrink:0"></span>
+        <span style="font-size:16px;font-weight:700">${group}</span>
+        <span style="font-size:12px;color:var(--text3)">${lastStr}</span>
+      </div>
+      <button onclick="document.getElementById('musclePopup').style.display='none'"
+        style="background:none;border:none;padding:4px;cursor:pointer;color:var(--text3);line-height:0">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="20" height="20"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div style="font-size:11px;color:var(--text3);letter-spacing:.07em;margin-bottom:8px">EXERCISES (${exercises.length})</div>
+    <div style="display:flex;flex-direction:column;gap:5px">
+      ${exercises.map(ex => `
+        <div style="background:var(--card);border-radius:10px;padding:9px 12px;font-size:13px;display:flex;align-items:center;gap:8px">
+          <span style="width:7px;height:7px;border-radius:50%;background:${col};flex-shrink:0"></span>
+          <span>${esc(ex.name)}</span>
+          ${ex.custom ? '<span style="margin-left:auto;font-size:10px;color:var(--text3);background:var(--surface);padding:2px 6px;border-radius:6px">custom</span>' : ''}
+        </div>`).join('')}
+    </div>`;
+  popup.style.display = 'block';
+
+  setTimeout(() => {
+    const close = e => { if (!popup.contains(e.target)) { popup.style.display = 'none'; document.removeEventListener('touchstart', close); document.removeEventListener('mousedown', close); } };
+    document.addEventListener('touchstart', close, { passive: true });
+    document.addEventListener('mousedown', close);
+  }, 50);
 }
 
 /* ═══════════════════════════════════════════════════════════
