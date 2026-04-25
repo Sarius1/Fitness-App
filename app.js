@@ -520,13 +520,13 @@ function selectColor(el, c) {
 }
 
 function openNewPlan(preserveSelection = false) {
-  if (!preserveSelection) { state.pickerSelected = []; state.pickerPlanColor = PLAN_COLORS[0]; }
+  if (!preserveSelection) { state.pickerSelected = []; state.pickerPlanColor = PLAN_COLORS[0]; state.pickerPlanName = ''; state.pickerPlanFreq = '2'; }
   openOverlay(`
-    <div class="input-group"><label class="input-label">Plan Name</label><input class="input" id="pn_name" type="text" placeholder="e.g. Push Day"></div>
-    <div class="input-group"><label class="input-label">Frequency (per week)</label><input class="input" id="pn_freq" type="number" inputmode="decimal" value="2" min="1" max="7"></div>
+    <div class="input-group"><label class="input-label">Plan Name</label><input class="input" id="pn_name" type="text" placeholder="e.g. Push Day" value="${esc(state.pickerPlanName||'')}"></div>
+    <div class="input-group"><label class="input-label">Frequency (per week)</label><input class="input" id="pn_freq" type="number" inputmode="decimal" value="${state.pickerPlanFreq||2}" min="1" max="7"></div>
     <div class="input-group"><label class="input-label">Color</label><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">${colorSwatches(state.pickerPlanColor)}</div></div>
     <button class="btn btn-secondary btn-full" style="margin-bottom:10px" onclick="openExPicker(null,'new')">+ Add Exercises <span style="color:var(--accent)">${state.pickerSelected.length ? '('+state.pickerSelected.length+' selected)' : ''}</span></button>
-    <button class="btn btn-primary btn-full" onclick="savePlan(null)">Create Plan</button>`, 'New Plan');
+    <button class="btn btn-primary btn-full" onclick="savePlan(null)">Save Plan</button>`, 'New Plan');
 }
 
 function openEditPlan(planId) {
@@ -543,9 +543,9 @@ function openEditPlan(planId) {
 }
 
 function savePlan(planId) {
-  const name = document.getElementById('pn_name')?.value.trim();
+  const name = (document.getElementById('pn_name')?.value || state.pickerPlanName || '').trim();
   if (!name) { showToast('Enter a plan name'); return; }
-  const freq = parseInt(document.getElementById('pn_freq')?.value) || 2;
+  const freq = parseInt(document.getElementById('pn_freq')?.value || state.pickerPlanFreq) || 2;
   const color = state.pickerPlanColor || PLAN_COLORS[0];
   const allEx = getAllExercises();
   const existing = planId ? (getPlans().find(p=>p.id===planId)?.exercises || []) : [];
@@ -577,6 +577,11 @@ function deletePlan(planId) {
 function openExPicker(planId, mode) {
   state.exPickerGroup = 'All';
   state.exPickerSearch = '';
+  if (mode === 'new') {
+    state.pickerPlanName = document.getElementById('pn_name')?.value || state.pickerPlanName || '';
+    state.pickerPlanFreq = document.getElementById('pn_freq')?.value || state.pickerPlanFreq || '2';
+    closeOverlay();
+  }
   renderExPicker(planId, mode);
 }
 
@@ -603,13 +608,16 @@ function renderExPicker(planId, mode) {
     </div>`;
   }).join('');
   const backCall = mode === 'edit' ? `openEditPlan('${planId}')` : 'openNewPlan(true)';
+  const rightBtn = mode === 'new'
+    ? `<button class="btn btn-primary btn-sm" onclick="closePanel();savePlan(null)">Save Plan</button>`
+    : `<span style="font-size:13px;color:var(--accent);font-weight:600">${state.pickerSelected.length} selected</span>`;
   openPanel(`
     <div class="panel-header">
       <button class="panel-back" onclick="closePanel();${backCall}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="20" height="20"><polyline points="15 18 9 12 15 6"/></svg> Back
       </button>
       <span class="panel-title">Choose Exercises</span>
-      <span style="font-size:13px;color:var(--accent);font-weight:600">${state.pickerSelected.length} selected</span>
+      ${rightBtn}
     </div>
     <div class="panel-body">
       <input class="input" type="search" placeholder="Search…" value="${esc(state.exPickerSearch)}"
@@ -658,6 +666,14 @@ function getLastSets(exId) {
   }
   return { weight:'', reps:'' };
 }
+function getLastSetsArray(exId) {
+  const hist = getHistory();
+  for (let i = hist.length-1; i >= 0; i--) {
+    const ex = (hist[i].exercises||[]).find(e => e.exerciseId===exId || e.id===exId);
+    if (ex?.sets?.length) return ex.sets.map(s => ({ weight:s.weight||'', reps:s.reps||'' }));
+  }
+  return null;
+}
 
 function startWorkout(planId) {
   const plan = getPlans().find(p => p.id === planId);
@@ -666,11 +682,15 @@ function startWorkout(planId) {
     id:uid(), planId, planName:plan.name, planColor:plan.color||'#8b5cf6',
     startTime:Date.now(),
     exercises:(plan.exercises||[]).map(ex => {
-      const last = getLastSets(ex.id);
+      const lastArr = getLastSetsArray(ex.id);
+      const fallback = getLastSets(ex.id);
       return {
         exerciseId:ex.id, name:ex.name, group:ex.group||'',
         plannedSets:ex.sets||3, plannedReps:ex.reps||'8-12',
-        sets:Array.from({length:ex.sets||3}, () => ({ weight:last.weight, reps:last.reps, done:false })),
+        sets:Array.from({length:ex.sets||3}, (_,si) => {
+          const prev = lastArr?.[si] || lastArr?.[lastArr.length-1] || fallback;
+          return { weight:prev.weight, reps:prev.reps, done:false };
+        }),
       };
     }),
   };
@@ -1123,6 +1143,34 @@ function renderAnalytics() {
       <div style="font-size:12px;color:var(--text2);margin:12px 0 6px">Estimated 1RM — Epley formula (kg)</div>
       <div class="chart-wrap"><canvas id="c_gym_1rm" height="140"></canvas></div>
     </div>
+    ${allExNames.length ? `
+    <div class="chart-card">
+      <div class="chart-title">Avg Weight & Reps per Exercise</div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead><tr style="color:var(--text2);text-align:left">
+            <th style="padding:6px 8px">Exercise</th>
+            <th style="padding:6px 8px;text-align:right">Avg kg</th>
+            <th style="padding:6px 8px;text-align:right">Avg reps</th>
+            <th style="padding:6px 8px;text-align:right">Sessions</th>
+          </tr></thead>
+          <tbody>${allExNames.map(n => {
+            const sessions = hist.filter(w=>(w.exercises||[]).some(e=>e.name===n));
+            const allSets = sessions.flatMap(w=>(w.exercises||[]).find(e=>e.name===n)?.sets||[]);
+            const validW = allSets.map(s=>parseFloat(s.weight)).filter(v=>v>0);
+            const validR = allSets.map(s=>parseFloat(s.reps)).filter(v=>v>0);
+            const avgW = validW.length ? (validW.reduce((a,b)=>a+b,0)/validW.length).toFixed(1) : '—';
+            const avgR = validR.length ? (validR.reduce((a,b)=>a+b,0)/validR.length).toFixed(1) : '—';
+            return `<tr style="border-top:1px solid var(--border)">
+              <td style="padding:7px 8px;font-weight:500">${esc(n)}</td>
+              <td style="padding:7px 8px;text-align:right">${avgW}</td>
+              <td style="padding:7px 8px;text-align:right">${avgR}</td>
+              <td style="padding:7px 8px;text-align:right;color:var(--text2)">${sessions.length}</td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table>
+      </div>
+    </div>` : ''}
 
     <div class="section-hd mt-8"><span class="section-title">Running</span></div>
     <div class="chart-card">
@@ -1208,11 +1256,12 @@ function getWeeklyRunDist(n) {
 ═══════════════════════════════════════════════════════════ */
 function initCanvas(canvas) {
   const dpr = Math.min(window.devicePixelRatio||1, 2);
-  // Collapse canvas first so it doesn't inflate the parent's clientWidth
-  canvas.style.width = '1px';
-  const w = (canvas.closest('.chart-wrap') || canvas.parentElement).clientWidth || 300;
+  // Reset intrinsic size so the canvas doesn't inflate its container
+  canvas.width = 0; canvas.height = 0;
+  canvas.style.width = ''; canvas.style.height = '';
+  const wrap = canvas.closest('.chart-card') || canvas.closest('.chart-wrap') || canvas.parentElement;
+  const w = wrap.clientWidth || 300;
   const h = parseInt(canvas.getAttribute('height')) || 160;
-  canvas.style.width = '';   // Let CSS width:100% handle display
   canvas.style.height = h + 'px';
   canvas.width  = w * dpr;
   canvas.height = h * dpr;
