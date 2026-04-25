@@ -1589,21 +1589,50 @@ function openMuscleMap() {
       <model-viewer
         id="muscleModelViewer"
         src="male_base_mesh_with_muscle_detail.glb"
-        camera-controls
-        touch-action="pan-y"
-        auto-rotate
-        auto-rotate-delay="3000"
-        rotation-per-second="20deg"
-        camera-orbit="0deg 80deg 2.5m"
-        min-camera-orbit="auto 40deg auto"
-        max-camera-orbit="auto 140deg auto"
-        style="width:100%;flex:1;min-height:0;background:transparent;--progress-bar-color:var(--accent)"
+        camera-orbit="0deg 90deg auto"
+        camera-target="auto"
+        field-of-view="45deg"
+        style="width:100%;flex:1;min-height:0;background:transparent;--progress-bar-color:var(--accent);touch-action:none"
         loading="eager"
       ></model-viewer>
       <div style="padding:10px 12px 16px;display:grid;grid-template-columns:1fr 1fr;gap:6px">
         ${chips}
       </div>
     </div>`);
+  requestAnimationFrame(initMuscleViewer);
+}
+
+function initMuscleViewer() {
+  const mv = document.getElementById('muscleModelViewer');
+  if (!mv) return;
+  let startX = 0, startTheta = 0, dragging = false;
+
+  const getTheta = () => {
+    try { const o = mv.getCameraOrbit(); return o ? o.theta * 180 / Math.PI : 0; }
+    catch { return 0; }
+  };
+  const setOrbit = theta => { mv.cameraOrbit = `${theta}deg 90deg auto`; };
+
+  mv.addEventListener('touchstart', e => {
+    startX = e.touches[0].clientX; startTheta = getTheta(); dragging = true;
+  }, { passive: true });
+  mv.addEventListener('touchmove', e => {
+    if (!dragging) return;
+    e.preventDefault();
+    setOrbit(startTheta - (e.touches[0].clientX - startX) * 0.4);
+  }, { passive: false });
+  mv.addEventListener('touchend', () => { dragging = false; });
+
+  mv.addEventListener('mousedown', e => {
+    startX = e.clientX; startTheta = getTheta(); dragging = true;
+    e.preventDefault();
+    const onMove = ev => { if (dragging) setOrbit(startTheta - (ev.clientX - startX) * 0.4); };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', () => {
+      dragging = false;
+      document.removeEventListener('mousemove', onMove);
+    }, { once: true });
+  });
 }
 
 /* ═══════════════════════════════════════════════════════════
