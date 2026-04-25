@@ -804,14 +804,97 @@ function renderHistory() {
     const dur = wo.duration ? `${Math.floor(wo.duration/60)}min` : '';
     const exNames = (wo.exercises||[]).map(e=>e.name).slice(0,3).join(', ');
     const more = (wo.exercises?.length||0) > 3 ? ` +${wo.exercises.length-3}` : '';
-    return `<div class="hist-card">
+    const totalSets = (wo.exercises||[]).reduce((s,e)=>s+(e.sets?.length||0), 0);
+    return `<div class="hist-card" onclick="openEditWorkout('${wo.id}')" style="cursor:pointer">
       <div class="hist-card-top">
         <span class="hist-plan-name" style="color:${wo.planColor||'var(--accent)'}">${esc(wo.planName||'Workout')}</span>
         <span class="hist-date">${fmtShort(wo.date||'')}${dur?' · '+dur:''}</span>
       </div>
       <div class="hist-ex-list">${esc(exNames+more)||'—'}</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:4px">${totalSets} sets total · tap to edit</div>
     </div>`;
   }).join('');
+}
+
+function openEditWorkout(woId) {
+  const hist = getHistory();
+  const wo = hist.find(w => w.id === woId);
+  if (!wo) return;
+
+  const exHtml = (wo.exercises||[]).map((ex, ei) => {
+    const col = GROUP_COLORS[ex.group]||'#888';
+    const abbr = (ex.group||'?').substring(0,2).toUpperCase();
+    const setsHtml = (ex.sets||[]).map((set, si) =>
+      `<div class="set-row${set.done!==false?' done':''}" id="hsr_${ei}_${si}">
+        <div class="set-num">${si+1}</div>
+        <input class="set-input" type="number" inputmode="decimal" placeholder="kg"
+          value="${esc(set.weight)}" style="max-width:72px"
+          onchange="updHistSet('${woId}',${ei},${si},'weight',this.value)">
+        <span class="set-sep">×</span>
+        <input class="set-input" type="number" inputmode="decimal" placeholder="reps"
+          value="${esc(set.reps)}" style="max-width:72px"
+          onchange="updHistSet('${woId}',${ei},${si},'reps',this.value)">
+        <button class="icon-btn" style="color:var(--text3);padding:3px" onclick="delHistSet('${woId}',${ei},${si})">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="15" height="15"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>`).join('');
+    return `<div class="workout-ex-card" style="margin-bottom:8px">
+      <div class="workout-ex-header">
+        <div class="ex-badge" style="background:${col};width:30px;height:30px;border-radius:7px;font-size:10px">${abbr}</div>
+        <span class="workout-ex-name">${esc(ex.name)}</span>
+      </div>
+      <div class="workout-sets">
+        ${setsHtml}
+        <button class="add-set-btn" onclick="addHistSet('${woId}',${ei})">+ Add Set</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  openPanel(`
+    <div class="panel-header">
+      <button class="panel-back" onclick="closePanel();renderHistory()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="20" height="20"><polyline points="15 18 9 12 15 6"/></svg>
+        Back
+      </button>
+      <span class="panel-title">${esc(wo.planName||'Workout')}</span>
+      <button class="panel-action" onclick="deleteWorkoutEntry('${woId}')">Delete</button>
+    </div>
+    <div class="panel-body">
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <div class="macro-box" style="flex:1"><div class="macro-val">${fmtShort(wo.date||'')}</div><div class="macro-lbl">Date</div></div>
+        <div class="macro-box" style="flex:1"><div class="macro-val">${wo.duration?Math.floor(wo.duration/60):'—'}</div><div class="macro-unit">${wo.duration?'min':''}</div><div class="macro-lbl">Duration</div></div>
+        <div class="macro-box" style="flex:1"><div class="macro-val">${(wo.exercises||[]).reduce((s,e)=>s+(e.sets?.length||0),0)}</div><div class="macro-lbl">Total Sets</div></div>
+      </div>
+      ${exHtml}
+    </div>`);
+}
+
+function updHistSet(woId, ei, si, field, val) {
+  const hist = getHistory();
+  const wo = hist.find(w => w.id === woId); if (!wo) return;
+  if (wo.exercises[ei]?.sets[si]) wo.exercises[ei].sets[si][field] = val;
+  save(SK.HISTORY, hist);
+}
+function addHistSet(woId, ei) {
+  const hist = getHistory();
+  const wo = hist.find(w => w.id === woId); if (!wo) return;
+  const ex = wo.exercises[ei]; const last = ex.sets[ex.sets.length-1]||{};
+  ex.sets.push({ weight:last.weight||'', reps:last.reps||'', done:true });
+  save(SK.HISTORY, hist);
+  openEditWorkout(woId);
+}
+function delHistSet(woId, ei, si) {
+  const hist = getHistory();
+  const wo = hist.find(w => w.id === woId); if (!wo) return;
+  if (wo.exercises[ei].sets.length <= 1) { showToast('Need at least 1 set'); return; }
+  wo.exercises[ei].sets.splice(si, 1);
+  save(SK.HISTORY, hist);
+  openEditWorkout(woId);
+}
+function deleteWorkoutEntry(woId) {
+  if (!confirm('Delete this workout entry?')) return;
+  save(SK.HISTORY, getHistory().filter(w => w.id !== woId));
+  closePanel(); renderHistory(); showToast('Workout deleted');
 }
 
 /* ── Running ────────────────────────────────────────────── */
@@ -820,14 +903,27 @@ function calcPace(distKm, timeSec) {
   const ps = timeSec/distKm; return `${Math.floor(ps/60)}:${String(Math.round(ps%60)).padStart(2,'0')}`;
 }
 function parseDuration(s) {
-  const parts = String(s).split(':').map(Number);
+  const parts = String(s).replace(/[^0-9:]/g,'').split(':').map(Number);
   if (parts.length===3) return parts[0]*3600+parts[1]*60+parts[2];
   if (parts.length===2) return parts[0]*60+parts[1];
   return Number(s)||0;
 }
 function fmtDuration(sec) {
   const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60),s=sec%60;
-  return h ? `${h}h ${m}m` : `${m}m ${s}s`;
+  return h ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}` : `${m}:${String(s).padStart(2,'0')}`;
+}
+function fmtTimeHMS(sec) {
+  const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60),s=sec%60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+// Auto-format time input: user types digits only, colons inserted automatically
+function onTimeKey(el) {
+  const cursor = el.selectionStart;
+  let digits = el.value.replace(/\D/g,'').slice(0,6);
+  let formatted = digits;
+  if (digits.length > 4) formatted = digits.slice(0,2)+':'+digits.slice(2,4)+':'+digits.slice(4);
+  else if (digits.length > 2) formatted = digits.slice(0,2)+':'+digits.slice(2);
+  el.value = formatted;
 }
 
 function renderRunningList() {
@@ -839,46 +935,135 @@ function renderRunningList() {
     return;
   }
   el.innerHTML = addBtn + runs.map(r => {
-    const pace = calcPace(r.distance, r.time);
-    return `<div class="run-card">
-      <div class="run-icon">🏃</div>
+    const isInterval = r.type === 'interval';
+    const pace = isInterval ? '--' : calcPace(r.distance, r.time);
+    const icon = isInterval ? '⚡' : '🏃';
+    const badge = isInterval
+      ? `<span style="background:rgba(249,115,22,.15);color:#f97316;font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;margin-left:6px">INTERVAL</span>`
+      : '';
+    const detail = isInterval
+      ? `${r.intervals}× ${fmtDuration(r.workTime)} / ${fmtDuration(r.restTime)} rest`
+      : `${fmtDuration(r.time)}`;
+    const sub = r.notes ? ` · ${esc(r.notes)}` : '';
+    return `<div class="run-card" onclick="openEditRun('${r.id}')">
+      <div class="run-icon" style="${isInterval?'background:rgba(249,115,22,.15)':''}">${icon}</div>
       <div class="run-info">
-        <div class="run-date">${fmtShort(r.date)}</div>
+        <div class="run-date">${fmtShort(r.date)}${badge}</div>
         <div class="run-main">${r.distance} km</div>
-        <div class="run-details">${fmtDuration(r.time)}${r.notes?' · '+esc(r.notes):''}</div>
+        <div class="run-details">${detail}${sub}</div>
       </div>
-      <div style="text-align:right">
-        <div class="run-pace">${pace}</div>
-        <div class="run-pace-label">min/km</div>
+      <div style="text-align:right;flex-shrink:0">
+        ${isInterval
+          ? `<div class="run-pace">${r.intervals}<span style="font-size:10px;font-weight:400"> reps</span></div>`
+          : `<div class="run-pace">${pace}</div><div class="run-pace-label">min/km</div>`}
       </div>
-      <button class="icon-btn food-delete" onclick="deleteRun('${r.id}')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
-      </button>
     </div>`;
   }).join('');
 }
 
-function openAddRun() {
-  openOverlay(`
-    <div class="input-group"><label class="input-label">Date</label><input class="input" id="r_date" type="date" value="${todayStr()}"></div>
-    <div class="input-row">
-      <div class="input-group"><label class="input-label">Distance (km)</label><input class="input" id="r_dist" type="number" inputmode="decimal" step="0.01" placeholder="5.0"></div>
-      <div class="input-group"><label class="input-label">Time (mm:ss)</label><input class="input" id="r_time" type="text" placeholder="25:30"></div>
+// Run form builder (shared by add and edit)
+function runFormHTML(r = {}) {
+  const isInt = r.type === 'interval';
+  return `
+    <div class="input-group"><label class="input-label">Date</label><input class="input" id="r_date" type="date" value="${r.date||todayStr()}"></div>
+    <div class="input-group">
+      <label class="input-label">Type</label>
+      <div style="display:flex;gap:8px">
+        <button type="button" id="r_type_normal" onclick="setRunType('normal')"
+          class="btn btn-sm" style="flex:1;${!isInt?'background:var(--accent);color:#fff':'background:var(--card2);color:var(--text)'}">Normal Run</button>
+        <button type="button" id="r_type_interval" onclick="setRunType('interval')"
+          class="btn btn-sm" style="flex:1;${isInt?'background:#f97316;color:#fff':'background:var(--card2);color:var(--text)'}">Interval Run</button>
+      </div>
     </div>
-    <div class="input-group"><label class="input-label">Notes (optional)</label><input class="input" id="r_notes" type="text" placeholder="Morning run…"></div>
-    <button class="btn btn-primary btn-full mt-8" onclick="saveRun()">Save Run</button>`, 'Log Run');
+    <div class="input-group"><label class="input-label">Distance (km)</label><input class="input" id="r_dist" type="number" inputmode="decimal" step="0.01" placeholder="5.0" value="${r.distance||''}"></div>
+    <div id="r_normal_fields" style="display:${isInt?'none':'block'}">
+      <div class="input-group">
+        <label class="input-label">Total Time (hh:mm:ss — type digits only)</label>
+        <input class="input" id="r_time" type="text" inputmode="numeric" placeholder="00:25:30"
+          value="${r.time?fmtTimeHMS(r.time):''}" oninput="onTimeKey(this)">
+      </div>
+    </div>
+    <div id="r_interval_fields" style="display:${isInt?'block':'none'}">
+      <div class="input-group"><label class="input-label">Number of Intervals</label><input class="input" id="r_intervals" type="number" inputmode="decimal" placeholder="8" value="${r.intervals||''}"></div>
+      <div class="input-row">
+        <div class="input-group">
+          <label class="input-label">Work Time (hh:mm:ss)</label>
+          <input class="input" id="r_worktime" type="text" inputmode="numeric" placeholder="00:01:00"
+            value="${r.workTime?fmtTimeHMS(r.workTime):''}" oninput="onTimeKey(this)">
+        </div>
+        <div class="input-group">
+          <label class="input-label">Rest Time (hh:mm:ss)</label>
+          <input class="input" id="r_resttime" type="text" inputmode="numeric" placeholder="00:00:30"
+            value="${r.restTime?fmtTimeHMS(r.restTime):''}" oninput="onTimeKey(this)">
+        </div>
+      </div>
+    </div>
+    <div class="input-group"><label class="input-label">Notes (optional)</label><input class="input" id="r_notes" type="text" placeholder="Morning run, felt great…" value="${esc(r.notes||'')}"></div>`;
+}
+
+function setRunType(type) {
+  const isInt = type === 'interval';
+  document.getElementById('r_normal_fields').style.display = isInt ? 'none' : 'block';
+  document.getElementById('r_interval_fields').style.display = isInt ? 'block' : 'none';
+  document.getElementById('r_type_normal').style.cssText += isInt ? ';background:var(--card2);color:var(--text)' : ';background:var(--accent);color:#fff';
+  document.getElementById('r_type_interval').style.cssText += isInt ? ';background:#f97316;color:#fff' : ';background:var(--card2);color:var(--text)';
+}
+
+function collectRunForm() {
+  const isInterval = document.getElementById('r_interval_fields').style.display !== 'none';
+  const dist = parseFloat(document.getElementById('r_dist')?.value);
+  if (!dist) { showToast('Enter distance'); return null; }
+  const run = {
+    date: document.getElementById('r_date')?.value || todayStr(),
+    type: isInterval ? 'interval' : 'normal',
+    distance: dist,
+    notes: document.getElementById('r_notes')?.value.trim() || '',
+  };
+  if (isInterval) {
+    run.intervals = parseInt(document.getElementById('r_intervals')?.value) || 0;
+    run.workTime  = parseDuration(document.getElementById('r_worktime')?.value || '');
+    run.restTime  = parseDuration(document.getElementById('r_resttime')?.value || '');
+    if (!run.intervals || !run.workTime) { showToast('Enter intervals and work time'); return null; }
+    run.time = run.intervals * (run.workTime + run.restTime); // total session time
+  } else {
+    const t = document.getElementById('r_time')?.value.trim();
+    if (!t) { showToast('Enter time'); return null; }
+    run.time = parseDuration(t);
+  }
+  return run;
+}
+
+function openAddRun() {
+  openOverlay(`${runFormHTML()}<button class="btn btn-primary btn-full mt-8" onclick="saveRun()">Save Run</button>`, 'Log Run');
 }
 function saveRun() {
-  const dist = parseFloat(document.getElementById('r_dist')?.value);
-  const timeStr = document.getElementById('r_time')?.value.trim();
-  if (!dist || !timeStr) { showToast('Enter distance and time'); return; }
-  const run = { id:uid(), date:document.getElementById('r_date')?.value||todayStr(), distance:dist, time:parseDuration(timeStr), notes:document.getElementById('r_notes')?.value.trim()||'' };
+  const run = collectRunForm(); if (!run) return;
+  run.id = uid();
   const runs = getRuns(); runs.unshift(run); save(SK.RUNS, runs);
   closeOverlay(); renderRunningList(); showToast('Run logged! 🏃');
 }
+
+function openEditRun(id) {
+  const run = getRuns().find(r => r.id === id);
+  if (!run) return;
+  openOverlay(`${runFormHTML(run)}
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn btn-primary" style="flex:1" onclick="saveEditRun('${id}')">Save Changes</button>
+      <button class="btn btn-danger" onclick="deleteRun('${id}')">Delete</button>
+    </div>`, 'Edit Run');
+}
+function saveEditRun(id) {
+  const updated = collectRunForm(); if (!updated) return;
+  updated.id = id;
+  const runs = getRuns().map(r => r.id === id ? updated : r);
+  save(SK.RUNS, runs);
+  closeOverlay(); renderRunningList(); showToast('Run updated!');
+}
+
 function deleteRun(id) {
   if (!confirm('Delete this run?')) return;
-  save(SK.RUNS, getRuns().filter(r=>r.id!==id)); renderRunningList(); showToast('Run deleted');
+  save(SK.RUNS, getRuns().filter(r => r.id !== id));
+  closeOverlay(); renderRunningList(); showToast('Run deleted');
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -935,13 +1120,17 @@ function renderAnalytics() {
 
     <div class="section-hd mt-8"><span class="section-title">Running</span></div>
     <div class="chart-card">
-      <div class="chart-title">Pace over Time (min/km)</div>
+      <div class="chart-title">Pace — Normal Runs (min/km)</div>
       <div class="chart-wrap"><canvas id="c_run_pace" height="150"></canvas></div>
     </div>
     <div class="chart-card">
       <div class="chart-title">Weekly Distance (km)</div>
       <div class="chart-wrap"><canvas id="c_run_wk" height="150"></canvas></div>
-    </div>`;
+    </div>
+    ${runs.some(r=>r.type==='interval') ? `<div class="chart-card">
+      <div class="chart-title" style="color:#f97316">⚡ Interval Sessions — Reps per Session</div>
+      <div class="chart-wrap"><canvas id="c_run_intervals" height="140"></canvas></div>
+    </div>` : ''}` ;
 
   requestAnimationFrame(() => { drawNutCharts(); drawGymCharts(); drawRunCharts(); });
 }
@@ -971,13 +1160,27 @@ function drawGymCharts() {
 }
 
 function drawRunCharts() {
-  const runs = getRuns().sort((a,b)=>a.date.localeCompare(b.date)).slice(-20);
-  const labels = runs.map(r=>fmtShort(r.date));
-  const paces  = runs.map(r => r.distance&&r.time ? parseFloat((r.time/60/r.distance).toFixed(2)) : 0);
-  const pc = document.getElementById('c_run_pace'); if (pc) drawLine(pc, labels, [{values:paces, color:'#22c55e'}]);
+  const allRuns = getRuns().sort((a,b)=>a.date.localeCompare(b.date));
+  // Pace chart: normal runs only (pace meaningless for intervals)
+  const normalRuns = allRuns.filter(r => r.type !== 'interval').slice(-20);
+  const paceLabels = normalRuns.map(r=>fmtShort(r.date));
+  const paces = normalRuns.map(r => r.distance&&r.time ? parseFloat((r.time/60/r.distance).toFixed(2)) : 0);
+  const pc = document.getElementById('c_run_pace');
+  if (pc) drawLine(pc, paceLabels, [{values:paces, color:'#22c55e'}]);
 
+  // Weekly distance: all runs
   const wkData = getWeeklyRunDist(8);
-  const wc = document.getElementById('c_run_wk'); if (wc) drawBar(wc, wkData.labels, wkData.values, { color:'#14b8a6' });
+  const wc = document.getElementById('c_run_wk');
+  if (wc) drawBar(wc, wkData.labels, wkData.values, { color:'#14b8a6' });
+
+  // Interval summary chart if any exist
+  const intervalRuns = allRuns.filter(r => r.type === 'interval').slice(-15);
+  const ic = document.getElementById('c_run_intervals');
+  if (ic && intervalRuns.length) {
+    const iLabels = intervalRuns.map(r=>fmtShort(r.date));
+    const iCounts = intervalRuns.map(r=>r.intervals||0);
+    drawBar(ic, iLabels, iCounts, { color:'#f97316' });
+  }
 }
 
 function getWeeklyRunDist(n) {
@@ -998,13 +1201,17 @@ function getWeeklyRunDist(n) {
    CHART ENGINE
 ═══════════════════════════════════════════════════════════ */
 function initCanvas(canvas) {
-  const dpr=Math.min(window.devicePixelRatio||1,2);
-  const w=canvas.parentElement.clientWidth||300;
-  const h=parseInt(canvas.getAttribute('height'))||160;
-  canvas.style.width=w+'px'; canvas.style.height=h+'px';
-  canvas.width=w*dpr; canvas.height=h*dpr;
-  const ctx=canvas.getContext('2d'); ctx.scale(dpr,dpr);
-  return {ctx,w,h};
+  const dpr = Math.min(window.devicePixelRatio||1, 2);
+  // Collapse canvas first so it doesn't inflate the parent's clientWidth
+  canvas.style.width = '1px';
+  const w = (canvas.closest('.chart-wrap') || canvas.parentElement).clientWidth || 300;
+  const h = parseInt(canvas.getAttribute('height')) || 160;
+  canvas.style.width = '';   // Let CSS width:100% handle display
+  canvas.style.height = h + 'px';
+  canvas.width  = w * dpr;
+  canvas.height = h * dpr;
+  const ctx = canvas.getContext('2d'); ctx.scale(dpr, dpr);
+  return { ctx, w, h };
 }
 function cTheme() {
   const dark=document.documentElement.getAttribute('data-theme')==='dark';
