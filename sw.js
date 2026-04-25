@@ -1,5 +1,5 @@
-const CACHE = 'fittrack-v1';
-const FILES = ['./', './index.html', './style.css', './app.js', './icon.svg', './manifest.json'];
+const CACHE = 'fittrack-v2';
+const FILES = ['./', './index.html', './style.css', './app.js', './icon.svg', './manifest.json', './male_base_mesh_with_muscle_detail.glb'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)));

@@ -1476,6 +1476,7 @@ function muscleStatusColor(group, status) {
 }
 
 function bodyModelSVG(view, status) {
+  // Legacy — kept for reference but no longer used
   const mc = g => muscleStatusColor(g, status);
   const dark = document.documentElement.getAttribute('data-theme') === 'dark';
   const bf = dark ? '#252525' : '#dedad4';
@@ -1558,6 +1559,18 @@ function bodyModelSVG(view, status) {
 
 function openMuscleMap() {
   const status = getMuscleTrainingStatus();
+  const MUSCLE_GROUPS = ['Chest','Back','Shoulders','Biceps','Triceps','Core','Legs'];
+  const chips = MUSCLE_GROUPS.map(g => {
+    const d = status[g];
+    const color = d === undefined ? '#ef4444' : d <= 7 ? '#22c55e' : d <= 14 ? '#f59e0b' : '#ef4444';
+    const label = d === undefined ? 'Not trained' : d === 0 ? 'Today' : `${d}d ago`;
+    return `<div style="display:flex;align-items:center;gap:6px;background:var(--card);border-radius:10px;padding:7px 12px;font-size:13px">
+      <span style="width:10px;height:10px;border-radius:50%;background:${color};flex-shrink:0"></span>
+      <span style="font-weight:600;color:var(--text1)">${g}</span>
+      <span style="color:var(--text3);font-size:11px;margin-left:auto">${label}</span>
+    </div>`;
+  }).join('');
+
   openPanel(`
     <div class="panel-header">
       <button class="panel-back" onclick="closePanel();renderAnalytics()">
@@ -1567,68 +1580,30 @@ function openMuscleMap() {
       <span class="panel-title">Muscle Map</span>
       <span></span>
     </div>
-    <div class="panel-body" style="display:flex;flex-direction:column;align-items:center;padding:16px 12px;overflow:hidden">
-      <div style="display:flex;gap:16px;margin-bottom:14px;font-size:12px;flex-wrap:wrap;justify-content:center">
+    <div class="panel-body" style="padding:0;display:flex;flex-direction:column;overflow:hidden;height:100%">
+      <div style="display:flex;gap:8px;padding:8px 12px 6px;flex-wrap:wrap;justify-content:center;font-size:11px">
         <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-right:4px;vertical-align:middle"></span>This week</span>
         <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f59e0b;margin-right:4px;vertical-align:middle"></span>8–14 days</span>
         <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ef4444;margin-right:4px;vertical-align:middle"></span>Not trained</span>
       </div>
-      <div style="perspective:700px;width:188px;height:368px;flex-shrink:0">
-        <div id="bodyModelCard" style="width:100%;height:100%;position:relative;transform-style:preserve-3d;transform:rotateY(${state.bodyModelRotation}deg);cursor:grab">
-          <div style="position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden">
-            ${bodyModelSVG('front', status)}
-          </div>
-          <div style="position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;transform:rotateY(180deg)">
-            ${bodyModelSVG('back', status)}
-          </div>
-        </div>
+      <model-viewer
+        id="muscleModelViewer"
+        src="male_base_mesh_with_muscle_detail.glb"
+        camera-controls
+        touch-action="pan-y"
+        auto-rotate
+        auto-rotate-delay="3000"
+        rotation-per-second="20deg"
+        camera-orbit="0deg 80deg 2.5m"
+        min-camera-orbit="auto 40deg auto"
+        max-camera-orbit="auto 140deg auto"
+        style="width:100%;flex:1;min-height:0;background:transparent;--progress-bar-color:var(--accent)"
+        loading="eager"
+      ></model-viewer>
+      <div style="padding:10px 12px 16px;display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        ${chips}
       </div>
-      <div style="color:var(--text3);font-size:11px;margin-top:10px;letter-spacing:.04em">DRAG TO ROTATE</div>
     </div>`);
-  requestAnimationFrame(initBodyModel);
-}
-
-function initBodyModel() {
-  const card = document.getElementById('bodyModelCard');
-  if (!card) return;
-  let startX = 0, baseRot = state.bodyModelRotation || 0, dragging = false;
-
-  const applyRot = (r, animate) => {
-    card.style.transition = animate ? 'transform 0.35s ease' : 'none';
-    card.style.transform = `rotateY(${r}deg)`;
-    if (animate) setTimeout(() => { card && (card.style.transition = ''); }, 380);
-  };
-
-  card.addEventListener('touchstart', e => {
-    startX = e.touches[0].clientX; baseRot = state.bodyModelRotation || 0; dragging = true;
-  }, { passive: true });
-  card.addEventListener('touchmove', e => {
-    if (!dragging) return; e.preventDefault();
-    applyRot(baseRot - (e.touches[0].clientX - startX) * 0.6, false);
-  }, { passive: false });
-  card.addEventListener('touchend', e => {
-    if (!dragging) return; dragging = false;
-    const r = baseRot - (e.changedTouches[0].clientX - startX) * 0.6;
-    state.bodyModelRotation = Math.round(r / 180) * 180;
-    applyRot(state.bodyModelRotation, true);
-  });
-
-  card.addEventListener('mousedown', e => {
-    startX = e.clientX; baseRot = state.bodyModelRotation || 0; dragging = true;
-    card.style.cursor = 'grabbing'; e.preventDefault();
-    const mmove = ev => { if (dragging) applyRot(baseRot - (ev.clientX - startX) * 0.6, false); };
-    const mup   = ev => {
-      dragging = false; card.style.cursor = 'grab';
-      const r = baseRot - (ev.clientX - startX) * 0.6;
-      state.bodyModelRotation = Math.round(r / 180) * 180;
-      applyRot(state.bodyModelRotation, true);
-      document.removeEventListener('mousemove', mmove);
-    };
-    document.addEventListener('mousemove', mmove);
-    document.addEventListener('mouseup', mup, { once: true });
-  });
-
-  applyRot(state.bodyModelRotation || 0, false);
 }
 
 /* ═══════════════════════════════════════════════════════════
