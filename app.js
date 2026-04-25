@@ -315,7 +315,21 @@ function openDayView(dateStr) {
   const foods = dayData.foods || [];
   const goals = getGoals();
   const tot = getDayTotals(dateStr);
-  const bwVal = dayData.weight || '';
+  // Body weight entries — support legacy single value and new array format
+  const bwEntries = dayData.weights?.length ? dayData.weights
+    : dayData.weight ? [{ value: dayData.weight, time: '' }] : [];
+  const bwAvg = bwEntries.length ? Math.round(bwEntries.reduce((s,w)=>s+w.value,0)/bwEntries.length*10)/10 : null;
+  const bwListHtml = bwEntries.length
+    ? bwEntries.map((w,i) => `
+        <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">
+          ${w.time ? `<span style="font-size:11px;color:var(--text2);min-width:36px">${w.time}</span>` : ''}
+          <span style="font-weight:700;font-size:15px;flex:1">${w.value} kg</span>
+          <button class="icon-btn" style="color:var(--text3)" onclick="deleteWeight('${dateStr}',${i})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="15" height="15"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>`).join('') +
+      (bwEntries.length > 1 ? `<div style="font-size:12px;color:var(--text2);padding-top:7px">Ø <b>${bwAvg} kg</b></div>` : '')
+    : `<div style="font-size:12px;color:var(--text3);padding:4px 0">No entries yet</div>`;
   const sd = getSplitDayForDate(dateStr);
   const sdCol = sd ? splitDayColor(sd) : null;
   const splitBanner = sd
@@ -377,15 +391,12 @@ function openDayView(dateStr) {
     <div class="panel-body">
       ${splitBanner}
       <div class="card" style="margin-bottom:10px">
-        <div style="display:flex;align-items:center;gap:10px">
-          <div style="flex:1">
-            <div class="card-title" style="margin-bottom:0">Body Weight</div>
-          </div>
+        <div class="card-title">Body Weight</div>
+        ${bwListHtml}
+        <div style="display:flex;gap:8px;align-items:center;margin-top:10px">
           <input class="input" id="bw_input" type="number" inputmode="decimal" step="0.1"
-            placeholder="—" value="${bwVal}"
-            style="width:88px;text-align:right;font-size:17px;font-weight:700;padding:8px 10px">
-          <span style="color:var(--text2);font-size:13px;font-weight:500">kg</span>
-          <button class="btn btn-primary btn-sm" onclick="saveBodyWeight('${dateStr}')">Save</button>
+            placeholder="kg" style="flex:1;text-align:right;font-size:16px;font-weight:700;padding:9px 12px">
+          <button class="btn btn-primary btn-sm" onclick="saveBodyWeight('${dateStr}')">+ Add</button>
         </div>
       </div>
       <div class="macros-grid">${macroBoxes}</div>
@@ -455,12 +466,30 @@ function deleteFood(dateStr, foodId) {
 
 function saveBodyWeight(dateStr) {
   const val = parseFloat(document.getElementById('bw_input')?.value);
+  if (!(val > 0)) { showToast('Enter a weight'); return; }
+  const now = new Date();
+  const time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
   const data = getNutritionData();
   if (!data[dateStr]) data[dateStr] = { foods: [] };
-  if (val > 0) data[dateStr].weight = val;
-  else delete data[dateStr].weight;
+  // Migrate legacy single-value format
+  if (data[dateStr].weight && !data[dateStr].weights) {
+    data[dateStr].weights = [{ value: data[dateStr].weight, time: '' }];
+    delete data[dateStr].weight;
+  }
+  if (!data[dateStr].weights) data[dateStr].weights = [];
+  data[dateStr].weights.push({ value: val, time });
   save(SK.NUTRITION, data);
-  showToast(val > 0 ? `${val} kg saved!` : 'Weight cleared');
+  showToast(`${val} kg logged!`);
+  openDayView(dateStr);
+}
+
+function deleteWeight(dateStr, idx) {
+  const data = getNutritionData();
+  if (data[dateStr]?.weights) {
+    data[dateStr].weights.splice(idx, 1);
+    save(SK.NUTRITION, data);
+  }
+  openDayView(dateStr);
 }
 
 function openActivityOverride(dateStr) {
@@ -1708,7 +1737,15 @@ function drawWeightChart() {
   const days = getLast30Days();
   const data = getNutritionData();
   const labels = days.map(d => { const dt=parseDate(d); return `${dt.getMonth()+1}/${dt.getDate()}`; });
-  const weights = days.map(d => data[d]?.weight ? parseFloat(data[d].weight) : null);
+  const weights = days.map(d => {
+    const dd = data[d];
+    if (!dd) return null;
+    if (dd.weights?.length) {
+      const avg = dd.weights.reduce((s,w)=>s+w.value,0) / dd.weights.length;
+      return Math.round(avg * 10) / 10;
+    }
+    return dd.weight ? parseFloat(dd.weight) : null;
+  });
   const wc = document.getElementById('c_weight');
   if (wc) drawLine(wc, labels, [{ values: weights, color: '#8b5cf6' }]);
 }
