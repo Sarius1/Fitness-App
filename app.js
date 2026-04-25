@@ -1557,6 +1557,109 @@ function bodyModelSVG(view, status) {
   </svg>`;
 }
 
+function initAnalyticsMuscleViewer() {
+  const mv = document.getElementById('analyticsMV');
+  const overlay = document.getElementById('analyticsMuscleOverlay');
+  if (!mv || !overlay) return;
+
+  const status = getMuscleTrainingStatus();
+  const LABEL_DEFS = [
+    ['Chest',     48, 30, 'front'],
+    ['Shoulders', 22, 20, 'front'],
+    ['Biceps',    10, 38, 'front'],
+    ['Core',      48, 45, 'front'],
+    ['Legs',      48, 65, 'both' ],
+    ['Back',      48, 30, 'back' ],
+    ['Triceps',   10, 38, 'back' ],
+  ];
+  const muscleColor = g => { const d = status[g]; return d === undefined ? '#ef4444' : d <= 7 ? '#22c55e' : d <= 14 ? '#f59e0b' : '#ef4444'; };
+
+  const labelEls = LABEL_DEFS.map(([group, x, y, side]) => {
+    const col = muscleColor(group);
+    const btn = document.createElement('button');
+    btn.dataset.group = group; btn.dataset.side = side;
+    btn.style.cssText = [
+      'position:absolute', `left:${x}%`, `top:${y}%`, 'transform:translate(-50%,-50%)',
+      `background:${col}cc`, 'color:#fff', `border:1.5px solid ${col}`,
+      'border-radius:20px', 'padding:4px 11px', 'font-size:11px', 'font-weight:700',
+      'letter-spacing:.05em', 'cursor:pointer', 'pointer-events:auto',
+      'backdrop-filter:blur(6px)', '-webkit-backdrop-filter:blur(6px)',
+      'text-shadow:0 1px 3px rgba(0,0,0,.6)', 'white-space:nowrap',
+      'transition:opacity .15s', 'line-height:1.4',
+    ].join(';');
+    btn.textContent = group.toUpperCase();
+    btn.addEventListener('click', e => { e.stopPropagation(); showMuscleGroupOverlay(group); });
+    overlay.appendChild(btn);
+    return btn;
+  });
+
+  let currentTheta = 0, interacting = false;
+
+  const updateLabels = theta => {
+    currentTheta = theta;
+    const rad = (((theta % 360) + 360) % 360) * Math.PI / 180;
+    const fc = Math.cos(rad);
+    labelEls.forEach(el => {
+      const side = el.dataset.side;
+      const op = side === 'both' ? 1 : side === 'front' ? Math.max(0, fc) : Math.max(0, -fc);
+      el.style.opacity = op;
+      el.style.pointerEvents = op > 0.25 ? 'auto' : 'none';
+    });
+  };
+
+  const enterInteract = () => {
+    if (interacting) return;
+    interacting = true;
+    mv.removeAttribute('auto-rotate');
+    try { const o = mv.getCameraOrbit(); if (o) currentTheta = o.theta * 180 / Math.PI; } catch {}
+    overlay.style.opacity = '1';
+    updateLabels(currentTheta);
+    const hint = document.getElementById('analyticsTapHint');
+    if (hint) { hint.style.opacity = '0'; setTimeout(() => hint.remove(), 600); }
+  };
+
+  mv.addEventListener('click', enterInteract);
+
+  let startX = 0, startTheta = 0, dragging = false;
+  const getTheta = () => { try { const o = mv.getCameraOrbit(); return o ? o.theta * 180 / Math.PI : currentTheta; } catch { return currentTheta; } };
+  const setOrbit = theta => { mv.cameraOrbit = `${theta}deg 90deg auto`; if (interacting) updateLabels(theta); };
+
+  mv.addEventListener('touchstart', e => { startX = e.touches[0].clientX; startTheta = getTheta(); dragging = true; }, { passive: true });
+  mv.addEventListener('touchmove', e => {
+    if (!dragging) return;
+    if (Math.abs(e.touches[0].clientX - startX) > 6) { enterInteract(); e.preventDefault(); setOrbit(startTheta - (e.touches[0].clientX - startX) * 0.4); }
+  }, { passive: false });
+  mv.addEventListener('touchend', () => { dragging = false; });
+  mv.addEventListener('mousedown', e => {
+    startX = e.clientX; startTheta = getTheta(); dragging = true; e.preventDefault();
+    const onMove = ev => { if (dragging && Math.abs(ev.clientX - startX) > 4) { enterInteract(); setOrbit(startTheta - (ev.clientX - startX) * 0.4); } };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', () => { dragging = false; document.removeEventListener('mousemove', onMove); }, { once: true });
+  });
+}
+
+function showMuscleGroupOverlay(group) {
+  const status = getMuscleTrainingStatus();
+  const d = status[group];
+  const col = d === undefined ? '#ef4444' : d <= 7 ? '#22c55e' : d <= 14 ? '#f59e0b' : '#ef4444';
+  const lastStr = d === undefined ? 'Never trained' : d === 0 ? 'Trained today' : `${d} day${d===1?'':'s'} ago`;
+  const exercises = getAllExercises().filter(e => e.group === group);
+  openOverlay(`
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+      <span style="width:10px;height:10px;border-radius:50%;background:${col};flex-shrink:0"></span>
+      <span style="color:var(--text3);font-size:13px">${lastStr}</span>
+    </div>
+    <div style="font-size:11px;color:var(--text3);letter-spacing:.07em;margin-bottom:8px">EXERCISES (${exercises.length})</div>
+    <div style="display:flex;flex-direction:column;gap:5px">
+      ${exercises.map(ex => `
+        <div style="background:var(--card);border-radius:10px;padding:9px 12px;font-size:13px;display:flex;align-items:center;gap:8px">
+          <span style="width:6px;height:6px;border-radius:50%;background:${col};flex-shrink:0"></span>
+          <span>${esc(ex.name)}</span>
+          ${ex.custom ? '<span style="margin-left:auto;font-size:10px;color:var(--text3)">custom</span>' : ''}
+        </div>`).join('')}
+    </div>`, group);
+}
+
 function openMuscleMap() {
   const status = getMuscleTrainingStatus();
   state.muscleStatus = status;
@@ -1788,19 +1891,30 @@ function renderAnalytics() {
       <div class="stat-card"><div class="stat-icon">🥩</div><div><span class="stat-val">${avgPro}</span><span class="stat-unit">g</span></div><div class="stat-lbl">Avg Protein</div></div>
     </div>
 
-    <div class="chart-card" style="cursor:pointer;margin-top:10px" onclick="openMuscleMap()">
-      <div style="display:flex;align-items:center;gap:12px">
-        <div style="flex:1">
-          <div class="chart-title" style="margin-bottom:6px">Muscle Map</div>
-          <div style="font-size:12px;color:var(--text2);margin-bottom:10px">${trainedThisWeek}/${MUSCLE_GROUPS.length} groups this week · drag to rotate</div>
-          <div style="display:flex;flex-wrap:wrap;gap:4px">
-            ${MUSCLE_GROUPS.map(g => {
-              const col = muscleStatusColor(g, muscleStatus);
-              return `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;background:${col};color:#fff">${g}</span>`;
-            }).join('')}
-          </div>
-        </div>
-        <span style="color:var(--accent);font-size:20px;flex-shrink:0">→</span>
+    <div class="chart-card" style="padding:0;overflow:hidden;margin-top:10px">
+      <div style="position:relative;height:340px">
+        <model-viewer
+          id="analyticsMV"
+          src="male_base_mesh_with_muscle_detail.glb"
+          auto-rotate
+          rotation-per-second="15deg"
+          auto-rotate-delay="0"
+          camera-orbit="0deg 90deg auto"
+          camera-target="auto"
+          field-of-view="70deg"
+          style="width:100%;height:100%;background:transparent;--progress-bar-color:var(--accent);touch-action:none;cursor:pointer"
+          loading="eager"
+        ></model-viewer>
+        <div id="analyticsMuscleOverlay" style="position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity 0.3s"></div>
+        <div id="analyticsTapHint" style="position:absolute;bottom:10px;left:0;right:0;text-align:center;color:rgba(255,255,255,.38);font-size:11px;pointer-events:none;letter-spacing:.08em">TAP TO INTERACT</div>
+      </div>
+      <div style="padding:8px 12px 12px;display:flex;flex-wrap:wrap;gap:6px;border-top:1px solid var(--border)">
+        ${MUSCLE_GROUPS.map(g => {
+          const col = muscleStatusColor(g, muscleStatus);
+          const d = muscleStatus[g];
+          const days = d === undefined ? '' : d === 0 ? ' · today' : ` · ${d}d`;
+          return `<button onclick="showMuscleGroupOverlay('${g}')" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;background:${col};color:#fff;border:none;cursor:pointer;letter-spacing:.03em">${g}${days}</button>`;
+        }).join('')}
       </div>
     </div>
 
@@ -1847,7 +1961,7 @@ function renderAnalytics() {
       <div class="chart-wrap"><canvas id="c_run_intervals" height="140"></canvas></div>
     </div>` : ''}` ;
 
-  requestAnimationFrame(() => { drawNutCharts(); drawWeightChart(); drawGymCharts(); drawRunCharts(); });
+  requestAnimationFrame(() => { drawNutCharts(); drawWeightChart(); drawGymCharts(); drawRunCharts(); initAnalyticsMuscleViewer(); });
 }
 
 function drawNutCharts() {
