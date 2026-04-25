@@ -103,6 +103,7 @@ const state = {
   editSplitDays: [],
   editSplitId: null,
   editSplitName: '',
+  bodyModelRotation: 0,
   timerInterval: null,
   analyticsGymExercise: '',
   exPickerGroup: 'All',
@@ -317,13 +318,17 @@ function openDayView(dateStr) {
   const bwVal = dayData.weight || '';
   const sd = getSplitDayForDate(dateStr);
   const sdCol = sd ? splitDayColor(sd) : null;
-  const splitBanner = sd ? `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:${sdCol}18;border-radius:12px;margin-bottom:10px;border:1px solid ${sdCol}44">
-    <span style="font-size:20px">${sd.type==='rest'?'😴':sd.type==='run'?'🏃':'🏋️'}</span>
-    <div>
-      <div style="font-weight:700;font-size:14px;color:${sdCol}">${esc(sd.label)}</div>
-      <div style="font-size:11px;color:var(--text2)">Planned ${sd.type==='plan'?'workout':sd.type}</div>
-    </div>
-  </div>` : '';
+  const splitBanner = sd
+    ? `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:${sdCol}18;border-radius:12px;margin-bottom:10px;border:1px solid ${sdCol}44">
+        <span style="font-size:20px">${sd.type==='rest'?'😴':sd.type==='run'?'🏃':'🏋️'}</span>
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:14px;color:${sdCol}">${esc(sd.label)}</div>
+          <div style="font-size:11px;color:var(--text2)">${sd.isOverride?'Custom for today':'Planned '+( sd.type==='plan'?'workout':sd.type)}</div>
+        </div>
+        <button class="btn btn-sm btn-secondary" onclick="openActivityOverride('${dateStr}')">Change</button>
+        ${sd.isOverride?`<button class="icon-btn" style="color:var(--text3)" onclick="clearDayActivity('${dateStr}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>`:''}
+      </div>`
+    : `<button class="btn btn-secondary btn-full" style="margin-bottom:10px" onclick="openActivityOverride('${dateStr}')">+ Add Activity for this day</button>`;
 
   const macroBoxes = ['calories','protein','carbs','fat'].map(k => {
     const unit = k === 'calories' ? 'kcal' : 'g';
@@ -458,6 +463,63 @@ function saveBodyWeight(dateStr) {
   showToast(val > 0 ? `${val} kg saved!` : 'Weight cleared');
 }
 
+function openActivityOverride(dateStr) {
+  const plans = getPlans();
+  const planBtns = plans.map(p =>
+    `<button class="btn btn-secondary" style="justify-content:flex-start;gap:10px;margin-bottom:6px" onclick="setDayActivity('${dateStr}','plan','${p.id}','')">
+      <div style="width:10px;height:10px;border-radius:50%;background:${p.color||'var(--accent)'};flex-shrink:0"></div>
+      ${esc(p.name)}
+    </button>`
+  ).join('');
+  const hasOverride = !!getNutritionData()[dateStr]?.activityOverride;
+  openOverlay(`
+    <div style="display:flex;flex-direction:column;gap:0">
+      ${planBtns || '<div style="color:var(--text2);font-size:13px;margin-bottom:8px">No workout plans yet</div>'}
+      <button class="btn btn-secondary" style="justify-content:flex-start;gap:10px;margin-bottom:6px" onclick="setDayActivity('${dateStr}','run','','Run')">
+        <span style="font-size:16px">🏃</span> Run
+      </button>
+      <button class="btn btn-secondary" style="justify-content:flex-start;gap:10px;margin-bottom:6px" onclick="setDayActivity('${dateStr}','rest','','Rest')">
+        <span style="font-size:16px">😴</span> Rest
+      </button>
+      <button class="btn btn-secondary" style="justify-content:flex-start;gap:10px" onclick="openCustomDayActivity('${dateStr}')">
+        <span style="font-size:16px">✏️</span> Custom…
+      </button>
+      ${hasOverride ? `<div class="divider" style="margin:12px 0"></div>
+        <button class="btn btn-secondary btn-full" onclick="clearDayActivity('${dateStr}')">↩ Reset to split plan</button>` : ''}
+    </div>
+  `, 'Activity for ' + fmtShort(dateStr));
+}
+
+function setDayActivity(dateStr, type, planId, label) {
+  const resolvedLabel = label || (type === 'plan' ? (getPlans().find(p=>p.id===planId)?.name || 'Workout') : type === 'run' ? 'Run' : 'Rest');
+  const data = getNutritionData();
+  if (!data[dateStr]) data[dateStr] = { foods: [] };
+  data[dateStr].activityOverride = { type, planId: planId||'', label: resolvedLabel };
+  save(SK.NUTRITION, data);
+  closeOverlay();
+  openDayView(dateStr);
+  showToast('Activity set!');
+}
+
+function openCustomDayActivity(dateStr) {
+  closeOverlay();
+  openOverlay(`
+    <div class="input-group">
+      <label class="input-label">Activity Name</label>
+      <input class="input" id="ca_label" type="text" placeholder="e.g. Yoga, Cycling, Mobility…">
+    </div>
+    <button class="btn btn-primary btn-full mt-8" onclick="setDayActivity('${dateStr}','custom','',document.getElementById('ca_label')?.value||'Custom')">Set Activity</button>
+  `, 'Custom Activity');
+}
+
+function clearDayActivity(dateStr) {
+  const data = getNutritionData();
+  if (data[dateStr]) { delete data[dateStr].activityOverride; save(SK.NUTRITION, data); }
+  closeOverlay();
+  openDayView(dateStr);
+  showToast('Reset to split');
+}
+
 function openGoalsModal() {
   const g = getGoals();
   openOverlay(`
@@ -537,7 +599,6 @@ function renderPlans() {
       <div class="plan-card-header">
         <div class="plan-color-dot" style="background:${p.color||'#8b5cf6'}"></div>
         <span class="plan-card-name">${esc(p.name)}</span>
-        <span class="plan-card-freq">${p.frequency}×/week</span>
       </div>
       <div class="plan-card-body">
         <div class="plan-ex-chips">${chips}${more}</div>
@@ -570,7 +631,6 @@ function openNewPlan(preserveSelection = false) {
   if (!preserveSelection) { state.pickerSelected = []; state.pickerPlanColor = PLAN_COLORS[0]; }
   openOverlay(`
     <div class="input-group"><label class="input-label">Plan Name</label><input class="input" id="pn_name" type="text" placeholder="e.g. Push Day"></div>
-    <div class="input-group"><label class="input-label">Frequency (per week)</label><input class="input" id="pn_freq" type="number" inputmode="decimal" value="2" min="1" max="7"></div>
     <div class="input-group"><label class="input-label">Color</label><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">${colorSwatches(state.pickerPlanColor)}</div></div>
     <button class="btn btn-secondary btn-full" style="margin-bottom:10px" onclick="openExPicker(null,'new')">+ Add Exercises <span style="color:var(--accent)">${state.pickerSelected.length ? '('+state.pickerSelected.length+' selected)' : ''}</span></button>
     <button class="btn btn-primary btn-full" onclick="savePlan(null)">Create Plan</button>`, 'New Plan');
@@ -583,7 +643,6 @@ function openEditPlan(planId) {
   state.pickerPlanColor = plan.color || PLAN_COLORS[0];
   openOverlay(`
     <div class="input-group"><label class="input-label">Plan Name</label><input class="input" id="pn_name" type="text" value="${esc(plan.name)}"></div>
-    <div class="input-group"><label class="input-label">Frequency (per week)</label><input class="input" id="pn_freq" type="number" inputmode="decimal" value="${plan.frequency||2}" min="1" max="7"></div>
     <div class="input-group"><label class="input-label">Color</label><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">${colorSwatches(state.pickerPlanColor)}</div></div>
     <button class="btn btn-secondary btn-full" style="margin-bottom:10px" onclick="openExPicker('${planId}','edit')">Manage Exercises <span style="color:var(--accent)">(${state.pickerSelected.length} selected)</span></button>
     <button class="btn btn-primary btn-full" onclick="savePlan('${planId}')">Save Changes</button>`, 'Edit Plan');
@@ -592,22 +651,22 @@ function openEditPlan(planId) {
 function savePlan(planId) {
   const name = (document.getElementById('pn_name')?.value || state.pickerPlanName || '').trim();
   if (!name) { showToast('Enter a plan name'); return; }
-  const freq = parseInt(document.getElementById('pn_freq')?.value || state.pickerPlanFreq) || 2;
   const color = state.pickerPlanColor || PLAN_COLORS[0];
   const allEx = getAllExercises();
-  const existing = planId ? (getPlans().find(p=>p.id===planId)?.exercises || []) : [];
+  const allPlans = getPlans();
+  const existing = planId ? (allPlans.find(p=>p.id===planId)?.exercises || []) : [];
   const exercises = state.pickerSelected.map(id => {
     const ex = allEx.find(e => e.id === id);
     const prev = existing.find(e => e.id === id);
     return ex ? { id:ex.id, name:ex.name, group:ex.group, sets:prev?.sets||3, reps:prev?.reps||'8-12' } : null;
   }).filter(Boolean);
 
-  const plans = getPlans();
+  const plans = allPlans;
   if (planId) {
     const idx = plans.findIndex(p => p.id === planId);
-    if (idx >= 0) plans[idx] = { ...plans[idx], name, frequency:freq, color, exercises };
+    if (idx >= 0) plans[idx] = { ...plans[idx], name, color, exercises };
   } else {
-    plans.push({ id:uid(), name, frequency:freq, color, exercises });
+    plans.push({ id:uid(), name, color, exercises });
   }
   save(SK.PLANS, plans);
   closeOverlay(); renderPlans();
@@ -623,7 +682,6 @@ function deletePlan(planId) {
 /* ── Exercise Picker ────────────────────────────────────── */
 function openExPicker(planId, mode) {
   state.pickerPlanName = document.getElementById('pn_name')?.value || state.pickerPlanName || '';
-  state.pickerPlanFreq = document.getElementById('pn_freq')?.value || state.pickerPlanFreq || '2';
   state.exPickerGroup = 'All';
   state.exPickerSearch = '';
   closeOverlay();
@@ -1147,6 +1205,8 @@ function splitDayColor(day) {
 }
 
 function getSplitDayForDate(dateStr) {
+  const override = getNutritionData()[dateStr]?.activityOverride;
+  if (override) return { ...override, isOverride: true };
   const as = getActiveSplit(); if (!as) return null;
   const split = getSplits().find(s => s.id === as.splitId); if (!split?.days.length) return null;
   const d0 = parseDate(as.startDate), d1 = parseDate(dateStr);
@@ -1364,6 +1424,184 @@ function deleteSplit(splitId) {
   showToast('Split deleted');
 }
 
+/* ── Muscle Model ───────────────────────────────────────── */
+function getMuscleTrainingStatus() {
+  const hist = getHistory();
+  const now = Date.now();
+  const best = {};
+  hist.forEach(wo => {
+    const days = Math.round((now - parseDate(wo.date).getTime()) / 86400000);
+    (wo.exercises||[]).forEach(ex => {
+      if (ex.group && (best[ex.group] === undefined || best[ex.group] > days)) best[ex.group] = days;
+    });
+  });
+  return best;
+}
+
+function muscleStatusColor(group, status) {
+  const d = status[group];
+  if (d === undefined) return 'rgba(239,68,68,0.58)';
+  if (d <= 7)  return 'rgba(34,197,94,0.72)';
+  if (d <= 14) return 'rgba(245,158,11,0.65)';
+  return 'rgba(239,68,68,0.58)';
+}
+
+function bodyModelSVG(view, status) {
+  const mc = g => muscleStatusColor(g, status);
+  const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const bf = dark ? '#252525' : '#dedad4';
+  const sf = dark ? '#2e2420' : '#f0dfc8';
+  const st = dark ? '#3a3a3a' : '#bbb4ac';
+  const lt = dark ? 'rgba(255,255,255,.6)' : 'rgba(0,0,0,.45)';
+
+  const base = `
+    <circle cx="80" cy="27" r="21" fill="${sf}" stroke="${st}" stroke-width="1.5"/>
+    <rect x="73" y="46" width="14" height="16" rx="5" fill="${sf}"/>
+    <path d="M 36,62 Q 57,56 80,56 Q 103,56 124,62 L 126,84 Q 103,78 80,78 Q 57,78 34,84 Z" fill="${bf}" stroke="${st}" stroke-width="1"/>
+    <path d="M 38,80 L 38,122 Q 40,134 50,136 L 50,164 L 110,164 L 110,136 Q 120,134 122,122 L 122,80 Z" fill="${bf}" stroke="${st}" stroke-width="1"/>
+    <path d="M 50,162 L 110,162 L 114,182 Q 98,195 80,196 Q 62,195 46,182 Z" fill="${bf}" stroke="${st}" stroke-width="1"/>
+    <path d="M 36,80 Q 26,84 22,98 L 18,142 Q 18,148 24,147 L 30,147 L 34,102 L 38,80 Z" fill="${bf}" stroke="${st}" stroke-width="1"/>
+    <path d="M 124,80 Q 134,84 138,98 L 142,142 Q 142,148 136,147 L 130,147 L 126,102 L 122,80 Z" fill="${bf}" stroke="${st}" stroke-width="1"/>
+    <path d="M 18,142 Q 16,148 18,162 L 22,182 Q 24,187 30,186 L 32,186 L 32,147 L 18,142 Z" fill="${sf}" stroke="${st}" stroke-width="1"/>
+    <path d="M 142,142 Q 144,148 142,162 L 138,182 Q 136,187 130,186 L 128,186 L 128,147 L 142,142 Z" fill="${sf}" stroke="${st}" stroke-width="1"/>
+    <ellipse cx="62" cy="237" rx="23" ry="51" fill="${bf}" stroke="${st}" stroke-width="1"/>
+    <ellipse cx="98" cy="237" rx="23" ry="51" fill="${bf}" stroke="${st}" stroke-width="1"/>
+    <ellipse cx="57" cy="321" rx="15" ry="36" fill="${bf}" stroke="${st}" stroke-width="1"/>
+    <ellipse cx="103" cy="321" rx="15" ry="36" fill="${bf}" stroke="${st}" stroke-width="1"/>
+    <ellipse cx="51" cy="361" rx="18" ry="9" fill="${sf}" stroke="${st}" stroke-width="1"/>
+    <ellipse cx="109" cy="361" rx="18" ry="9" fill="${sf}" stroke="${st}" stroke-width="1"/>`;
+
+  if (view === 'front') return `<svg viewBox="0 0 160 378" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%">
+    ${base}
+    <path d="M 36,62 Q 26,67 22,82 L 22,102 Q 28,110 36,106 L 36,80 Z" fill="${mc('Shoulders')}"/>
+    <path d="M 124,62 Q 134,67 138,82 L 138,102 Q 132,110 124,106 L 124,80 Z" fill="${mc('Shoulders')}"/>
+    <path d="M 40,80 L 40,122 Q 46,130 56,130 L 78,126 L 78,82 Q 58,78 40,80 Z" fill="${mc('Chest')}"/>
+    <path d="M 120,80 L 120,122 Q 114,130 104,130 L 82,126 L 82,82 Q 102,78 120,80 Z" fill="${mc('Chest')}"/>
+    <ellipse cx="22" cy="116" rx="10" ry="26" fill="${mc('Biceps')}"/>
+    <ellipse cx="138" cy="116" rx="10" ry="26" fill="${mc('Biceps')}"/>
+    <rect x="54" y="122" width="52" height="44" rx="8" fill="${mc('Core')}"/>
+    <line x1="80" y1="122" x2="80" y2="166" stroke="${st}" stroke-width="1" opacity="0.5"/>
+    <line x1="54" y1="138" x2="106" y2="138" stroke="${st}" stroke-width="1" opacity="0.5"/>
+    <line x1="54" y1="154" x2="106" y2="154" stroke="${st}" stroke-width="1" opacity="0.5"/>
+    <ellipse cx="62" cy="234" rx="20" ry="45" fill="${mc('Legs')}"/>
+    <ellipse cx="98" cy="234" rx="20" ry="45" fill="${mc('Legs')}"/>
+    <ellipse cx="57" cy="320" rx="12" ry="28" fill="${mc('Legs')}" opacity="0.75"/>
+    <ellipse cx="103" cy="320" rx="12" ry="28" fill="${mc('Legs')}" opacity="0.75"/>
+    <text x="29" y="93" text-anchor="middle" font-size="6" fill="${lt}" font-weight="700" font-family="system-ui,sans-serif">DELT</text>
+    <text x="131" y="93" text-anchor="middle" font-size="6" fill="${lt}" font-weight="700" font-family="system-ui,sans-serif">DELT</text>
+    <text x="59" y="102" text-anchor="middle" font-size="6.5" fill="${lt}" font-weight="700" font-family="system-ui,sans-serif">CHEST</text>
+    <text x="101" y="102" text-anchor="middle" font-size="6.5" fill="${lt}" font-weight="700" font-family="system-ui,sans-serif">CHEST</text>
+    <text x="22" y="115" text-anchor="middle" font-size="6" fill="${lt}" font-weight="700" font-family="system-ui,sans-serif">BIC</text>
+    <text x="138" y="115" text-anchor="middle" font-size="6" fill="${lt}" font-weight="700" font-family="system-ui,sans-serif">BIC</text>
+    <text x="80" y="146" text-anchor="middle" font-size="7" fill="${lt}" font-weight="700" font-family="system-ui,sans-serif">CORE</text>
+    <text x="62" y="235" text-anchor="middle" font-size="7" fill="${lt}" font-weight="700" font-family="system-ui,sans-serif">QUAD</text>
+    <text x="98" y="235" text-anchor="middle" font-size="7" fill="${lt}" font-weight="700" font-family="system-ui,sans-serif">QUAD</text>
+  </svg>`;
+
+  return `<svg viewBox="0 0 160 378" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%">
+    ${base}
+    <path d="M 36,62 Q 26,67 22,82 L 22,102 Q 28,110 36,106 L 36,80 Z" fill="${mc('Shoulders')}"/>
+    <path d="M 124,62 Q 134,67 138,82 L 138,102 Q 132,110 124,106 L 124,80 Z" fill="${mc('Shoulders')}"/>
+    <path d="M 40,62 L 120,62 L 118,94 Q 80,100 42,94 Z" fill="${mc('Back')}"/>
+    <path d="M 36,88 L 46,88 L 50,148 Q 44,156 36,150 L 32,136 Z" fill="${mc('Back')}"/>
+    <path d="M 124,88 L 114,88 L 110,148 Q 116,156 124,150 L 128,136 Z" fill="${mc('Back')}"/>
+    <rect x="54" y="140" width="52" height="26" rx="7" fill="${mc('Back')}"/>
+    <ellipse cx="22" cy="118" rx="10" ry="26" fill="${mc('Triceps')}"/>
+    <ellipse cx="138" cy="118" rx="10" ry="26" fill="${mc('Triceps')}"/>
+    <path d="M 46,162 L 80,160 L 114,162 L 114,184 Q 98,196 80,196 Q 62,196 46,184 Z" fill="${mc('Legs')}"/>
+    <ellipse cx="62" cy="234" rx="20" ry="45" fill="${mc('Legs')}"/>
+    <ellipse cx="98" cy="234" rx="20" ry="45" fill="${mc('Legs')}"/>
+    <ellipse cx="57" cy="320" rx="12" ry="30" fill="${mc('Legs')}" opacity="0.8"/>
+    <ellipse cx="103" cy="320" rx="12" ry="30" fill="${mc('Legs')}" opacity="0.8"/>
+    <text x="29" y="90" text-anchor="middle" font-size="6" fill="${lt}" font-weight="700" font-family="system-ui,sans-serif">DELT</text>
+    <text x="131" y="90" text-anchor="middle" font-size="6" fill="${lt}" font-weight="700" font-family="system-ui,sans-serif">DELT</text>
+    <text x="80" y="76" text-anchor="middle" font-size="6.5" fill="${lt}" font-weight="700" font-family="system-ui,sans-serif">TRAPS</text>
+    <text x="40" y="122" text-anchor="middle" font-size="6" fill="${lt}" font-weight="700" font-family="system-ui,sans-serif">LAT</text>
+    <text x="120" y="122" text-anchor="middle" font-size="6" fill="${lt}" font-weight="700" font-family="system-ui,sans-serif">LAT</text>
+    <text x="80" y="156" text-anchor="middle" font-size="6.5" fill="${lt}" font-weight="700" font-family="system-ui,sans-serif">LOWER</text>
+    <text x="22" y="118" text-anchor="middle" font-size="6" fill="${lt}" font-weight="700" font-family="system-ui,sans-serif">TRI</text>
+    <text x="138" y="118" text-anchor="middle" font-size="6" fill="${lt}" font-weight="700" font-family="system-ui,sans-serif">TRI</text>
+    <text x="80" y="180" text-anchor="middle" font-size="7" fill="${lt}" font-weight="700" font-family="system-ui,sans-serif">GLUTES</text>
+    <text x="62" y="235" text-anchor="middle" font-size="7" fill="${lt}" font-weight="700" font-family="system-ui,sans-serif">HAMS</text>
+    <text x="98" y="235" text-anchor="middle" font-size="7" fill="${lt}" font-weight="700" font-family="system-ui,sans-serif">HAMS</text>
+  </svg>`;
+}
+
+function openMuscleMap() {
+  const status = getMuscleTrainingStatus();
+  openPanel(`
+    <div class="panel-header">
+      <button class="panel-back" onclick="closePanel();renderAnalytics()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="20" height="20"><polyline points="15 18 9 12 15 6"/></svg>
+        Back
+      </button>
+      <span class="panel-title">Muscle Map</span>
+      <span></span>
+    </div>
+    <div class="panel-body" style="display:flex;flex-direction:column;align-items:center;padding:16px 12px;overflow:hidden">
+      <div style="display:flex;gap:16px;margin-bottom:14px;font-size:12px;flex-wrap:wrap;justify-content:center">
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-right:4px;vertical-align:middle"></span>This week</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f59e0b;margin-right:4px;vertical-align:middle"></span>8–14 days</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ef4444;margin-right:4px;vertical-align:middle"></span>Not trained</span>
+      </div>
+      <div style="perspective:700px;width:188px;height:368px;flex-shrink:0">
+        <div id="bodyModelCard" style="width:100%;height:100%;position:relative;transform-style:preserve-3d;transform:rotateY(${state.bodyModelRotation}deg);cursor:grab">
+          <div style="position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden">
+            ${bodyModelSVG('front', status)}
+          </div>
+          <div style="position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;transform:rotateY(180deg)">
+            ${bodyModelSVG('back', status)}
+          </div>
+        </div>
+      </div>
+      <div style="color:var(--text3);font-size:11px;margin-top:10px;letter-spacing:.04em">DRAG TO ROTATE</div>
+    </div>`);
+  requestAnimationFrame(initBodyModel);
+}
+
+function initBodyModel() {
+  const card = document.getElementById('bodyModelCard');
+  if (!card) return;
+  let startX = 0, baseRot = state.bodyModelRotation || 0, dragging = false;
+
+  const applyRot = (r, animate) => {
+    card.style.transition = animate ? 'transform 0.35s ease' : 'none';
+    card.style.transform = `rotateY(${r}deg)`;
+    if (animate) setTimeout(() => { card && (card.style.transition = ''); }, 380);
+  };
+
+  card.addEventListener('touchstart', e => {
+    startX = e.touches[0].clientX; baseRot = state.bodyModelRotation || 0; dragging = true;
+  }, { passive: true });
+  card.addEventListener('touchmove', e => {
+    if (!dragging) return; e.preventDefault();
+    applyRot(baseRot - (e.touches[0].clientX - startX) * 0.6, false);
+  }, { passive: false });
+  card.addEventListener('touchend', e => {
+    if (!dragging) return; dragging = false;
+    const r = baseRot - (e.changedTouches[0].clientX - startX) * 0.6;
+    state.bodyModelRotation = Math.round(r / 180) * 180;
+    applyRot(state.bodyModelRotation, true);
+  });
+
+  card.addEventListener('mousedown', e => {
+    startX = e.clientX; baseRot = state.bodyModelRotation || 0; dragging = true;
+    card.style.cursor = 'grabbing'; e.preventDefault();
+    const mmove = ev => { if (dragging) applyRot(baseRot - (ev.clientX - startX) * 0.6, false); };
+    const mup   = ev => {
+      dragging = false; card.style.cursor = 'grab';
+      const r = baseRot - (ev.clientX - startX) * 0.6;
+      state.bodyModelRotation = Math.round(r / 180) * 180;
+      applyRot(state.bodyModelRotation, true);
+      document.removeEventListener('mousemove', mmove);
+    };
+    document.addEventListener('mousemove', mmove);
+    document.addEventListener('mouseup', mup, { once: true });
+  });
+
+  applyRot(state.bodyModelRotation || 0, false);
+}
+
 /* ═══════════════════════════════════════════════════════════
    ANALYTICS
 ═══════════════════════════════════════════════════════════ */
@@ -1383,6 +1621,9 @@ function renderAnalytics() {
   const allExNames = [...new Set(hist.flatMap(w=>(w.exercises||[]).map(e=>e.name)))];
   if (!state.analyticsGymExercise && allExNames.length) state.analyticsGymExercise = allExNames[0];
   const exOpts = allExNames.map(n=>`<option value="${esc(n)}"${n===state.analyticsGymExercise?' selected':''}>${esc(n)}</option>`).join('');
+  const muscleStatus = getMuscleTrainingStatus();
+  const MUSCLE_GROUPS = ['Chest','Back','Shoulders','Biceps','Triceps','Core','Legs'];
+  const trainedThisWeek = MUSCLE_GROUPS.filter(g => (muscleStatus[g]||99) <= 7).length;
 
   el.innerHTML = `
     <div class="section-hd"><span class="section-title">This Week</span></div>
@@ -1391,6 +1632,22 @@ function renderAnalytics() {
       <div class="stat-card"><div class="stat-icon">🏃</div><div><span class="stat-val">${runWeek.toFixed(1)}</span><span class="stat-unit">km</span></div><div class="stat-lbl">Running</div></div>
       <div class="stat-card"><div class="stat-icon">🔥</div><div><span class="stat-val">${avgCal}</span><span class="stat-unit">kcal</span></div><div class="stat-lbl">Avg Calories</div></div>
       <div class="stat-card"><div class="stat-icon">🥩</div><div><span class="stat-val">${avgPro}</span><span class="stat-unit">g</span></div><div class="stat-lbl">Avg Protein</div></div>
+    </div>
+
+    <div class="chart-card" style="cursor:pointer;margin-top:10px" onclick="openMuscleMap()">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="flex:1">
+          <div class="chart-title" style="margin-bottom:6px">Muscle Map</div>
+          <div style="font-size:12px;color:var(--text2);margin-bottom:10px">${trainedThisWeek}/${MUSCLE_GROUPS.length} groups this week · drag to rotate</div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px">
+            ${MUSCLE_GROUPS.map(g => {
+              const col = muscleStatusColor(g, muscleStatus);
+              return `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;background:${col};color:#fff">${g}</span>`;
+            }).join('')}
+          </div>
+        </div>
+        <span style="color:var(--accent);font-size:20px;flex-shrink:0">→</span>
+      </div>
     </div>
 
     <div class="section-hd mt-8"><span class="section-title">Nutrition</span></div>
