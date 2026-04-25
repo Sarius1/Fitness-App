@@ -481,7 +481,7 @@ a { color: var(--accent); text-decoration: none; }
 }
 .chart-title { font-size: 15px; font-weight: 700; }
 .chart-wrap { position: relative; width: 100%; }
-.chart-wrap canvas { width: 100% !important; display: block; }
+.chart-wrap canvas { display: block; }
 .chart-legend {
   display: flex; gap: 12px; flex-wrap: wrap; margin-top: 10px;
 }

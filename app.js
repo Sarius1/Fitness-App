@@ -97,6 +97,8 @@ const state = {
   activeWorkout: null,
   pickerSelected: [],
   pickerPlanColor: PLAN_COLORS[0],
+  pickerPlanName: '',
+  pickerPlanFreq: '2',
   timerInterval: null,
   analyticsGymExercise: '',
   exPickerGroup: 'All',
@@ -543,9 +545,9 @@ function openEditPlan(planId) {
 }
 
 function savePlan(planId) {
-  const name = document.getElementById('pn_name')?.value.trim();
+  const name = (document.getElementById('pn_name')?.value || state.pickerPlanName || '').trim();
   if (!name) { showToast('Enter a plan name'); return; }
-  const freq = parseInt(document.getElementById('pn_freq')?.value) || 2;
+  const freq = parseInt(document.getElementById('pn_freq')?.value || state.pickerPlanFreq) || 2;
   const color = state.pickerPlanColor || PLAN_COLORS[0];
   const allEx = getAllExercises();
   const existing = planId ? (getPlans().find(p=>p.id===planId)?.exercises || []) : [];
@@ -575,8 +577,11 @@ function deletePlan(planId) {
 
 /* ── Exercise Picker ────────────────────────────────────── */
 function openExPicker(planId, mode) {
+  state.pickerPlanName = document.getElementById('pn_name')?.value || state.pickerPlanName || '';
+  state.pickerPlanFreq = document.getElementById('pn_freq')?.value || state.pickerPlanFreq || '2';
   state.exPickerGroup = 'All';
   state.exPickerSearch = '';
+  closeOverlay();
   renderExPicker(planId, mode);
 }
 
@@ -603,13 +608,14 @@ function renderExPicker(planId, mode) {
     </div>`;
   }).join('');
   const backCall = mode === 'edit' ? `openEditPlan('${planId}')` : 'openNewPlan(true)';
+  const saveCall = mode === 'edit' ? `savePlan('${planId}')` : `savePlan(null)`;
   openPanel(`
     <div class="panel-header">
       <button class="panel-back" onclick="closePanel();${backCall}">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="20" height="20"><polyline points="15 18 9 12 15 6"/></svg> Back
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="20" height="20"><polyline points="15 18 9 12 15 6"/></svg> Cancel
       </button>
-      <span class="panel-title">Choose Exercises</span>
-      <span style="font-size:13px;color:var(--accent);font-weight:600">${state.pickerSelected.length} selected</span>
+      <span class="panel-title">${state.pickerSelected.length} selected</span>
+      <button class="panel-action" onclick="closePanel();${saveCall}">Save</button>
     </div>
     <div class="panel-body">
       <input class="input" type="search" placeholder="Search…" value="${esc(state.exPickerSearch)}"
@@ -618,6 +624,7 @@ function renderExPicker(planId, mode) {
       <div class="ex-list">${rows || '<div style="text-align:center;padding:20px;color:var(--text2)">No exercises found</div>'}</div>
       <div class="divider" style="margin:14px 0"></div>
       <button class="btn btn-secondary btn-full" onclick="openCustomEx('${planId}','${mode}')">+ Add Custom Exercise</button>
+      <button class="btn btn-primary btn-full mt-8" onclick="closePanel();${saveCall}">Save Plan</button>
     </div>`);
 }
 
@@ -659,6 +666,15 @@ function getLastSets(exId) {
   return { weight:'', reps:'' };
 }
 
+function getLastSetsArray(exId) {
+  const hist = getHistory();
+  for (let i = hist.length-1; i >= 0; i--) {
+    const ex = (hist[i].exercises||[]).find(e => e.exerciseId===exId || e.id===exId);
+    if (ex?.sets?.length) return ex.sets.map(s => ({ weight:s.weight||'', reps:s.reps||'' }));
+  }
+  return null;
+}
+
 function startWorkout(planId) {
   const plan = getPlans().find(p => p.id === planId);
   if (!plan) return;
@@ -666,11 +682,15 @@ function startWorkout(planId) {
     id:uid(), planId, planName:plan.name, planColor:plan.color||'#8b5cf6',
     startTime:Date.now(),
     exercises:(plan.exercises||[]).map(ex => {
-      const last = getLastSets(ex.id);
+      const lastArr = getLastSetsArray(ex.id);
+      const fallback = { weight:'', reps:'' };
       return {
         exerciseId:ex.id, name:ex.name, group:ex.group||'',
         plannedSets:ex.sets||3, plannedReps:ex.reps||'8-12',
-        sets:Array.from({length:ex.sets||3}, () => ({ weight:last.weight, reps:last.reps, done:false })),
+        sets:Array.from({length:ex.sets||3}, (_,si) => {
+          const prev = lastArr?.[si] || lastArr?.[lastArr.length-1] || fallback;
+          return { weight:prev.weight, reps:prev.reps, done:false };
+        }),
       };
     }),
   };
@@ -1118,7 +1138,7 @@ function renderAnalytics() {
           ${allExNames.length ? exOpts : '<option value="">No workout history yet</option>'}
         </select>
       </div>
-      <div style="font-size:12px;color:var(--text2);margin-bottom:6px">Best weight per session (kg)</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:6px">Avg weight per session (kg)</div>
       <div class="chart-wrap"><canvas id="c_gym_w" height="150"></canvas></div>
       <div style="font-size:12px;color:var(--text2);margin:12px 0 6px">Estimated 1RM — Epley formula (kg)</div>
       <div class="chart-wrap"><canvas id="c_gym_1rm" height="140"></canvas></div>
@@ -1156,12 +1176,16 @@ function drawGymCharts() {
     .filter(w=>(w.exercises||[]).some(e=>e.name===exName))
     .sort((a,b)=>a.date.localeCompare(b.date)).slice(-20);
   const labels = sessions.map(w=>fmtShort(w.date));
-  const bestW = sessions.map(w => Math.max(...(w.exercises||[]).find(e=>e.name===exName)?.sets?.map(s=>parseFloat(s.weight)||0)||[0], 0));
+  const avgW = sessions.map(w => {
+    const sets = (w.exercises||[]).find(e=>e.name===exName)?.sets || [];
+    const weights = sets.map(s=>parseFloat(s.weight)||0).filter(v=>v>0);
+    return weights.length ? Math.round(weights.reduce((a,b)=>a+b,0)/weights.length*10)/10 : 0;
+  });
   const orm = sessions.map(w => {
     const sets = (w.exercises||[]).find(e=>e.name===exName)?.sets||[];
     return Math.max(...sets.map(s => { const wt=parseFloat(s.weight)||0, r=parseFloat(s.reps)||0; return wt&&r ? Math.round(wt*(1+r/30)) : 0; }), 0);
   });
-  const wc = document.getElementById('c_gym_w');   if (wc)  drawLine(wc,  labels, [{values:bestW, color:'#f59e0b'}]);
+  const wc = document.getElementById('c_gym_w');   if (wc)  drawLine(wc,  labels, [{values:avgW, color:'#f59e0b'}]);
   const rc = document.getElementById('c_gym_1rm'); if (rc)  drawLine(rc,  labels, [{values:orm,   color:'#ef4444'}]);
 }
 
@@ -1208,11 +1232,10 @@ function getWeeklyRunDist(n) {
 ═══════════════════════════════════════════════════════════ */
 function initCanvas(canvas) {
   const dpr = Math.min(window.devicePixelRatio||1, 2);
-  // Collapse canvas first so it doesn't inflate the parent's clientWidth
-  canvas.style.width = '1px';
-  const w = (canvas.closest('.chart-wrap') || canvas.parentElement).clientWidth || 300;
+  const card = canvas.closest('.chart-card');
+  const w = card ? Math.max(100, card.clientWidth - 32) : 300;
   const h = parseInt(canvas.getAttribute('height')) || 160;
-  canvas.style.width = '';   // Let CSS width:100% handle display
+  canvas.style.width  = w + 'px';
   canvas.style.height = h + 'px';
   canvas.width  = w * dpr;
   canvas.height = h * dpr;
