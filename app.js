@@ -98,6 +98,7 @@ const state = {
   nutritionMonth: (() => { const n = new Date(); return { y: n.getFullYear(), m: n.getMonth() }; })(),
   activeWorkout: null,
   pickerSelected: [],
+  pickerMachineSettings: {},
   pickerPlanColor: PLAN_COLORS[0],
   pickerPlanName: '',
   pickerPlanFreq: '2',
@@ -779,13 +780,42 @@ function selectColor(el, c) {
   state.pickerPlanColor = c;
 }
 
+function renderPlanExList() {
+  if (!state.pickerSelected.length) return '';
+  const allEx = getAllExercises();
+  const items = state.pickerSelected.map(id => {
+    const ex = allEx.find(e => e.id === id);
+    if (!ex) return '';
+    const ms = state.pickerMachineSettings[id] || {};
+    const col = GROUP_COLORS[ex.group] || '#888';
+    return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">
+      <div style="width:26px;height:26px;border-radius:6px;background:${col};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff;flex-shrink:0">${ex.group.substring(0,2).toUpperCase()}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(ex.name)}</div>
+        <div style="display:flex;gap:6px;margin-top:4px;align-items:center">
+          <span style="font-size:10px;color:var(--text3)">Sitz</span>
+          <input type="text" inputmode="numeric" placeholder="–" id="ms_seat_${id}" value="${esc(ms.seatPos||'')}"
+            style="width:42px;font-size:12px;padding:2px 5px;background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text1);text-align:center"
+            onchange="(state.pickerMachineSettings['${id}']||(state.pickerMachineSettings['${id}']={})).seatPos=this.value.trim()||null">
+          <span style="font-size:10px;color:var(--text3)">Brust</span>
+          <input type="text" inputmode="numeric" placeholder="–" id="ms_chest_${id}" value="${esc(ms.chestSupport||'')}"
+            style="width:42px;font-size:12px;padding:2px 5px;background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text1);text-align:center"
+            onchange="(state.pickerMachineSettings['${id}']||(state.pickerMachineSettings['${id}']={})).chestSupport=this.value.trim()||null">
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  return `<div style="margin-bottom:10px">${items}</div>`;
+}
+
 function openNewPlan(preserveSelection = false) {
-  if (!preserveSelection) { state.pickerSelected = []; state.pickerPlanColor = PLAN_COLORS[0]; }
+  if (!preserveSelection) { state.pickerSelected = []; state.pickerMachineSettings = {}; state.pickerPlanColor = PLAN_COLORS[0]; }
   openOverlay(`
-    <div class="input-group"><label class="input-label">Plan Name</label><input class="input" id="pn_name" type="text" placeholder="e.g. Push Day"></div>
+    <div class="input-group"><label class="input-label">Plan Name</label><input class="input" id="pn_name" type="text" placeholder="e.g. Push Day" value="${esc(state.pickerPlanName||'')}"></div>
     <div class="input-group"><label class="input-label">Color</label><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">${colorSwatches(state.pickerPlanColor)}</div></div>
-    <button class="btn btn-secondary btn-full" style="margin-bottom:10px" onclick="openExPicker(null,'new')">+ Add Exercises <span style="color:var(--accent)">${state.pickerSelected.length ? '('+state.pickerSelected.length+' selected)' : ''}</span></button>
-    <button class="btn btn-primary btn-full" onclick="savePlan(null)">Create Plan</button>`, 'New Plan');
+    <button class="btn btn-secondary btn-full" style="margin-bottom:10px" onclick="openExPicker(null,'new')">+ Übungen wählen <span style="color:var(--accent)">${state.pickerSelected.length ? '('+state.pickerSelected.length+')' : ''}</span></button>
+    ${renderPlanExList()}
+    <button class="btn btn-primary btn-full" onclick="savePlan(null)">Plan erstellen</button>`, 'Neuer Plan');
 }
 
 function openEditPlan(planId) {
@@ -793,16 +823,22 @@ function openEditPlan(planId) {
   if (!plan) return;
   state.pickerSelected = (plan.exercises||[]).map(e => e.id);
   state.pickerPlanColor = plan.color || PLAN_COLORS[0];
+  state.pickerMachineSettings = {};
+  (plan.exercises||[]).forEach(e => {
+    if (e.seatPos != null || e.chestSupport != null)
+      state.pickerMachineSettings[e.id] = { seatPos: e.seatPos||null, chestSupport: e.chestSupport||null };
+  });
   openOverlay(`
     <div class="input-group"><label class="input-label">Plan Name</label><input class="input" id="pn_name" type="text" value="${esc(plan.name)}"></div>
     <div class="input-group"><label class="input-label">Color</label><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">${colorSwatches(state.pickerPlanColor)}</div></div>
-    <button class="btn btn-secondary btn-full" style="margin-bottom:10px" onclick="openExPicker('${planId}','edit')">Manage Exercises <span style="color:var(--accent)">(${state.pickerSelected.length} selected)</span></button>
-    <button class="btn btn-primary btn-full" onclick="savePlan('${planId}')">Save Changes</button>`, 'Edit Plan');
+    <button class="btn btn-secondary btn-full" style="margin-bottom:10px" onclick="openExPicker('${planId}','edit')">Übungen bearbeiten <span style="color:var(--accent)">(${state.pickerSelected.length})</span></button>
+    ${renderPlanExList()}
+    <button class="btn btn-primary btn-full" onclick="savePlan('${planId}')">Änderungen speichern</button>`, 'Plan bearbeiten');
 }
 
 function savePlan(planId) {
   const name = (document.getElementById('pn_name')?.value || state.pickerPlanName || '').trim();
-  if (!name) { showToast('Enter a plan name'); return; }
+  if (!name) { showToast('Planname eingeben'); return; }
   const color = state.pickerPlanColor || PLAN_COLORS[0];
   const allEx = getAllExercises();
   const allPlans = getPlans();
@@ -810,7 +846,10 @@ function savePlan(planId) {
   const exercises = state.pickerSelected.map(id => {
     const ex = allEx.find(e => e.id === id);
     const prev = existing.find(e => e.id === id);
-    return ex ? { id:ex.id, name:ex.name, group:ex.group, sets:prev?.sets||3, reps:prev?.reps||'8-12' } : null;
+    const ms = state.pickerMachineSettings[id] || {};
+    const seatPos = document.getElementById('ms_seat_'+id)?.value.trim() || ms.seatPos || prev?.seatPos || null;
+    const chestSupport = document.getElementById('ms_chest_'+id)?.value.trim() || ms.chestSupport || prev?.chestSupport || null;
+    return ex ? { id:ex.id, name:ex.name, group:ex.group, sets:prev?.sets||3, reps:prev?.reps||'8-12', seatPos, chestSupport } : null;
   }).filter(Boolean);
 
   const plans = allPlans;
@@ -834,6 +873,13 @@ function deletePlan(planId) {
 /* ── Exercise Picker ────────────────────────────────────── */
 function openExPicker(planId, mode) {
   state.pickerPlanName = document.getElementById('pn_name')?.value || state.pickerPlanName || '';
+  state.pickerSelected.forEach(id => {
+    const s = document.getElementById('ms_seat_'+id)?.value.trim() || null;
+    const c = document.getElementById('ms_chest_'+id)?.value.trim() || null;
+    if (!state.pickerMachineSettings[id]) state.pickerMachineSettings[id] = {};
+    state.pickerMachineSettings[id].seatPos = s;
+    state.pickerMachineSettings[id].chestSupport = c;
+  });
   state.exPickerGroup = 'All';
   state.exPickerSearch = '';
   closeOverlay();
@@ -959,6 +1005,8 @@ function startWorkout(planId, lockerNum) {
       return {
         exerciseId:ex.id, name:ex.name, group:ex.group||'',
         plannedSets:ex.sets||3, plannedReps:ex.reps||'8-12',
+        seatPos: ex.seatPos || null,
+        chestSupport: ex.chestSupport || null,
         sets:Array.from({length:ex.sets||3}, (_,si) => {
           const prev = lastArr?.[si] || lastArr?.[lastArr.length-1] || fallback;
           return { weight:prev.weight, reps:prev.reps, done:false };
@@ -1107,6 +1155,12 @@ function saveMachineSettings(ei, seatPos, chestSupport) {
   aw.exercises[ei].seatPos = seatPos;
   aw.exercises[ei].chestSupport = chestSupport;
   save(SK.ACTIVE_WO, aw);
+  if (aw.planId) {
+    const plans = getPlans();
+    const plan = plans.find(p => p.id === aw.planId);
+    const pEx = plan?.exercises?.find(e => e.id === aw.exercises[ei].exerciseId);
+    if (pEx) { pEx.seatPos = seatPos; pEx.chestSupport = chestSupport; save(SK.PLANS, plans); }
+  }
   closeOverlay();
   renderWorkoutSession();
 }
