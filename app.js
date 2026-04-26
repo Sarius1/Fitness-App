@@ -1709,8 +1709,23 @@ function initAnalyticsMuscleViewer() {
     return null;
   };
 
+  // camera-change fires on any orbit/zoom interaction — use it to distinguish drag from tap
+  let cameraMovedSincePress = false;
+  mv.addEventListener('camera-change', () => { cameraMovedSincePress = true; });
+
+  mv.addEventListener('pointerdown', () => {
+    cameraMovedSincePress = false;
+    mv.removeAttribute('auto-rotate');
+    if (freezeTimer) clearTimeout(freezeTimer);
+    if (inactivityTimer) clearTimeout(inactivityTimer);
+  });
+
+  mv.addEventListener('pointerup', () => {
+    if (cameraMovedSincePress) resetInactivity();
+  });
+
   mv.addEventListener('click', e => {
-    if (isDragging) return;
+    if (cameraMovedSincePress) return;
     currentTheta = getTheta();
     const rect = mv.getBoundingClientRect();
     const px = e.clientX - rect.left, py = e.clientY - rect.top;
@@ -1719,41 +1734,6 @@ function initAnalyticsMuscleViewer() {
     const group = hit ? detectMuscleFrom3D(hit.position, hit.normal) : null;
     if (group) activateGroup(group);
     else { hideAll(); mv.setAttribute('auto-rotate', ''); }
-  });
-
-  let startX = 0, startTheta = 0;
-
-  mv.addEventListener('touchstart', e => {
-    startX = e.touches[0].clientX; startTheta = getTheta(); isDragging = false;
-    mv.removeAttribute('auto-rotate');
-    if (freezeTimer) clearTimeout(freezeTimer);
-    if (inactivityTimer) clearTimeout(inactivityTimer);
-  }, { passive: true });
-  mv.addEventListener('touchmove', e => {
-    if (Math.abs(e.touches[0].clientX - startX) > 6) {
-      isDragging = true; e.preventDefault();
-      setOrbit(startTheta - (e.touches[0].clientX - startX) * 0.4);
-    }
-  }, { passive: false });
-  mv.addEventListener('touchend', () => {
-    if (isDragging) resetInactivity();
-    setTimeout(() => { isDragging = false; }, 50);
-  });
-
-  mv.addEventListener('mousedown', e => {
-    startX = e.clientX; startTheta = getTheta(); isDragging = false; e.preventDefault();
-    mv.removeAttribute('auto-rotate');
-    if (freezeTimer) clearTimeout(freezeTimer);
-    if (inactivityTimer) clearTimeout(inactivityTimer);
-    const onMove = ev => {
-      if (Math.abs(ev.clientX - startX) > 4) { isDragging = true; setOrbit(startTheta - (ev.clientX - startX) * 0.4); }
-    };
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', () => {
-      document.removeEventListener('mousemove', onMove);
-      if (isDragging) resetInactivity();
-      setTimeout(() => { isDragging = false; }, 50);
-    }, { once: true });
   });
 }
 
@@ -2022,16 +2002,21 @@ function renderAnalytics() {
         <model-viewer
           id="analyticsMV"
           src="male_muscles_named.glb"
+          camera-controls
+          disable-pan
+          interaction-prompt="none"
           auto-rotate
           rotation-per-second="15deg"
           auto-rotate-delay="0"
-          camera-orbit="0deg 90deg 300%"
+          camera-orbit="0deg 90deg auto"
           camera-target="auto"
           field-of-view="75deg"
+          min-field-of-view="30deg"
+          max-field-of-view="120deg"
           environment-image="neutral"
           exposure="1.6"
           tone-mapping="neutral"
-          style="width:100%;height:100%;background:transparent;--progress-bar-color:var(--accent);touch-action:none;cursor:pointer"
+          style="width:100%;height:100%;background:transparent;--progress-bar-color:var(--accent);cursor:pointer"
           loading="eager"
         ></model-viewer>
         <div id="analyticsMuscleOverlay" style="position:absolute;inset:0;pointer-events:none;overflow:hidden"></div>
