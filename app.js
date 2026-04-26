@@ -1454,24 +1454,44 @@ function deleteSplit(splitId) {
 }
 
 /* ── Muscle Model ───────────────────────────────────────── */
+const MUSCLE_GROUPS = ['Chest','Back','Shoulders','Biceps','Triceps','Core','Legs'];
+
+// Returns { group: sessionCount } for the last 28 days (unique workout days per group)
+// Green ≥8 (2+/week), Orange ≥4 (1+/week), Red <4 (<1/week)
 function getMuscleTrainingStatus() {
   const hist = getHistory();
-  const now = Date.now();
-  const best = {};
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 28);
+  const cutoffStr = `${cutoff.getFullYear()}-${String(cutoff.getMonth()+1).padStart(2,'0')}-${String(cutoff.getDate()).padStart(2,'0')}`;
+  const sessionDates = {};
   hist.forEach(wo => {
-    const days = Math.round((now - parseDate(wo.date).getTime()) / 86400000);
-    (wo.exercises||[]).forEach(ex => {
-      if (ex.group && (best[ex.group] === undefined || best[ex.group] > days)) best[ex.group] = days;
-    });
+    if (wo.date < cutoffStr) return;
+    const groups = new Set((wo.exercises||[]).map(e => e.group).filter(Boolean));
+    groups.forEach(g => { if (!sessionDates[g]) sessionDates[g] = new Set(); sessionDates[g].add(wo.date); });
   });
-  return best;
+  const counts = {};
+  Object.entries(sessionDates).forEach(([g, s]) => { counts[g] = s.size; });
+  return counts;
+}
+
+function muscleFreqColor(sessions) {
+  if (sessions >= 8) return { hex: '#22c55e', rgb: [0.09, 0.68, 0.28] }; // green  2+/week
+  if (sessions >= 4) return { hex: '#f59e0b', rgb: [0.92, 0.55, 0.03] }; // orange 1+/week
+  return                    { hex: '#ef4444', rgb: [0.88, 0.18, 0.18] }; // red    <1/week
+}
+
+function colorMuscleModel(mv, status) {
+  if (!mv.model) return;
+  mv.model.materials.forEach(mat => {
+    if (!MUSCLE_GROUPS.includes(mat.name)) return;
+    const { rgb } = muscleFreqColor(status[mat.name] || 0);
+    mat.pbrMetallicRoughness.setBaseColorFactor([...rgb, 1.0]);
+  });
 }
 
 function muscleStatusColor(group, status) {
-  const d = status[group];
-  if (d === undefined) return 'rgba(239,68,68,0.58)';
-  if (d <= 7)  return 'rgba(34,197,94,0.72)';
-  if (d <= 14) return 'rgba(245,158,11,0.65)';
+  const n = status[group] || 0;
+  if (n >= 8) return 'rgba(34,197,94,0.72)';
+  if (n >= 4) return 'rgba(245,158,11,0.65)';
   return 'rgba(239,68,68,0.58)';
 }
 
@@ -1563,6 +1583,12 @@ function initAnalyticsMuscleViewer() {
   if (!mv || !overlay) return;
 
   const status = getMuscleTrainingStatus();
+
+  // Color named mesh materials on load (or immediately if already loaded)
+  const applyColors = () => colorMuscleModel(mv, status);
+  if (mv.model) applyColors();
+  else mv.addEventListener('load', applyColors, { once: true });
+
   const LABEL_DEFS = [
     ['Chest',     48, 30, 'front'],
     ['Shoulders', 22, 20, 'front'],
@@ -1572,7 +1598,7 @@ function initAnalyticsMuscleViewer() {
     ['Back',      48, 30, 'back' ],
     ['Triceps',   10, 38, 'back' ],
   ];
-  const muscleColor = g => { const d = status[g]; return d === undefined ? '#ef4444' : d <= 7 ? '#22c55e' : d <= 14 ? '#f59e0b' : '#ef4444'; };
+  const muscleColor = g => muscleFreqColor(status[g] || 0).hex;
 
   const labelEls = LABEL_DEFS.map(([group, x, y, side]) => {
     const col = muscleColor(group);
@@ -1640,9 +1666,12 @@ function initAnalyticsMuscleViewer() {
 
 function showMuscleGroupOverlay(group) {
   const status = getMuscleTrainingStatus();
-  const d = status[group];
-  const col = d === undefined ? '#ef4444' : d <= 7 ? '#22c55e' : d <= 14 ? '#f59e0b' : '#ef4444';
-  const lastStr = d === undefined ? 'Never trained' : d === 0 ? 'Trained today' : `${d} day${d===1?'':'s'} ago`;
+  const n = status[group] || 0;
+  const col = muscleFreqColor(n).hex;
+  const lastStr = n === 0 ? 'Not trained in last 4 weeks'
+                : n >= 8  ? `${n}× in 4 weeks — on track (2+/week)`
+                : n >= 4  ? `${n}× in 4 weeks — ok (1+/week)`
+                :           `${n}× in 4 weeks — train more`;
   const exercises = getAllExercises().filter(e => e.group === group);
   openOverlay(`
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
@@ -1678,7 +1707,7 @@ function openMuscleMap() {
       <div id="modelContent" style="position:absolute;inset:0;transition:transform 0.38s cubic-bezier(.4,0,.2,1)">
         <model-viewer
           id="muscleModelViewer"
-          src="male_base_mesh_with_muscle_detail.glb"
+          src="male_muscles_named.glb"
           auto-rotate
           rotation-per-second="15deg"
           auto-rotate-delay="0"
@@ -1704,6 +1733,11 @@ function initMuscleViewer() {
   if (!mv || !overlay) return;
 
   const status = state.muscleStatus || {};
+
+  const applyColors = () => colorMuscleModel(mv, status);
+  if (mv.model) applyColors();
+  else mv.addEventListener('load', applyColors, { once: true });
+
   // [group, x%, y%, side]  side: front|back|both
   const LABEL_DEFS = [
     ['Chest',     48, 30, 'front'],
@@ -1715,10 +1749,7 @@ function initMuscleViewer() {
     ['Triceps',   10, 38, 'back' ],
   ];
 
-  const muscleColor = g => {
-    const d = status[g];
-    return d === undefined ? '#ef4444' : d <= 7 ? '#22c55e' : d <= 14 ? '#f59e0b' : '#ef4444';
-  };
+  const muscleColor = g => muscleFreqColor(status[g] || 0).hex;
 
   const labelEls = LABEL_DEFS.map(([group, x, y, side]) => {
     const col = muscleColor(group);
@@ -1809,9 +1840,12 @@ function showMusclePopup(group) {
   if (!popup) return;
 
   const status = state.muscleStatus || {};
-  const d = status[group];
-  const col = d === undefined ? '#ef4444' : d <= 7 ? '#22c55e' : d <= 14 ? '#f59e0b' : '#ef4444';
-  const lastStr = d === undefined ? 'Never trained' : d === 0 ? 'Trained today' : `${d} day${d===1?'':'s'} ago`;
+  const n = status[group] || 0;
+  const col = muscleFreqColor(n).hex;
+  const lastStr = n === 0 ? 'Not trained in last 4 weeks'
+                : n >= 8  ? `${n}× — on track (2+/week)`
+                : n >= 4  ? `${n}× — ok (1+/week)`
+                :           `${n}× — train more`;
   const exercises = getAllExercises().filter(e => e.group === group);
 
   const closeMusclePopup = () => {
@@ -1879,7 +1913,6 @@ function renderAnalytics() {
   if (!state.analyticsGymExercise && allExNames.length) state.analyticsGymExercise = allExNames[0];
   const exOpts = allExNames.map(n=>`<option value="${esc(n)}"${n===state.analyticsGymExercise?' selected':''}>${esc(n)}</option>`).join('');
   const muscleStatus = getMuscleTrainingStatus();
-  const MUSCLE_GROUPS = ['Chest','Back','Shoulders','Biceps','Triceps','Core','Legs'];
   const trainedThisWeek = MUSCLE_GROUPS.filter(g => (muscleStatus[g]||99) <= 7).length;
 
   el.innerHTML = `
@@ -1895,7 +1928,7 @@ function renderAnalytics() {
       <div style="position:relative;height:340px">
         <model-viewer
           id="analyticsMV"
-          src="male_base_mesh_with_muscle_detail.glb"
+          src="male_muscles_named.glb"
           auto-rotate
           rotation-per-second="15deg"
           auto-rotate-delay="0"
@@ -1911,9 +1944,9 @@ function renderAnalytics() {
       <div style="padding:8px 12px 12px;display:flex;flex-wrap:wrap;gap:6px;border-top:1px solid var(--border)">
         ${MUSCLE_GROUPS.map(g => {
           const col = muscleStatusColor(g, muscleStatus);
-          const d = muscleStatus[g];
-          const days = d === undefined ? '' : d === 0 ? ' · today' : ` · ${d}d`;
-          return `<button onclick="showMuscleGroupOverlay('${g}')" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;background:${col};color:#fff;border:none;cursor:pointer;letter-spacing:.03em">${g}${days}</button>`;
+          const n = muscleStatus[g] || 0;
+          const tag = n === 0 ? '' : ` · ${n}×`;
+          return `<button onclick="showMuscleGroupOverlay('${g}')" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;background:${col};color:#fff;border:none;cursor:pointer;letter-spacing:.03em">${g}${tag}</button>`;
         }).join('')}
       </div>
     </div>
