@@ -1579,64 +1579,15 @@ function bodyModelSVG(view, status) {
 
 function initAnalyticsMuscleViewer() {
   const mv = document.getElementById('analyticsMV');
-  const overlay = document.getElementById('analyticsMuscleOverlay');
-  if (!mv || !overlay) return;
+  if (!mv) return;
 
   const status = getMuscleTrainingStatus();
   const applyColors = () => colorMuscleModel(mv, status);
   if (mv.model) applyColors();
   else mv.addEventListener('load', applyColors, { once: true });
 
-  // [group, side, y%] — labels positioned outside the body silhouette
-  const LABEL_DEFS = [
-    ['Shoulders', 'left',  22],
-    ['Back',      'left',  33],
-    ['Triceps',   'left',  45],
-    ['Chest',     'right', 33],
-    ['Biceps',    'right', 45],
-    ['Core',      'right', 54],
-    ['Legs',      'right', 68],
-  ];
-
-  const labelEls = {};
-  LABEL_DEFS.forEach(([group, side, y]) => {
-    const col = muscleFreqColor(status[group] || 0).hex;
-    const isLeft = side === 'left';
-    const wrap = document.createElement('div');
-    wrap.style.cssText = [
-      'position:absolute', isLeft ? 'left:4px' : 'right:4px', `top:${y}%`,
-      'transform:translateY(-50%)', 'display:flex', 'align-items:center', 'gap:3px',
-      'flex-direction:' + (isLeft ? 'row' : 'row-reverse'),
-      'opacity:0', 'transition:opacity .2s', 'pointer-events:none',
-    ].join(';');
-
-    const pill = document.createElement('button');
-    pill.style.cssText = [
-      `background:${col}ee`, 'color:#fff', `border:1.5px solid ${col}`,
-      'border-radius:20px', 'padding:3px 9px', 'font-size:10px', 'font-weight:700',
-      'letter-spacing:.05em', 'cursor:pointer', 'pointer-events:auto',
-      'backdrop-filter:blur(6px)', 'text-shadow:0 1px 3px rgba(0,0,0,.7)',
-      'white-space:nowrap', 'line-height:1.5',
-    ].join(';');
-    pill.textContent = group.toUpperCase();
-    pill.addEventListener('click', e => { e.stopPropagation(); showMuscleGroupOverlay(group); });
-
-    const arrow = document.createElement('span');
-    arrow.style.cssText = 'color:rgba(255,255,255,.55);font-size:11px;line-height:1;flex-shrink:0';
-    arrow.textContent = isLeft ? '→' : '←';
-
-    wrap.appendChild(pill);
-    wrap.appendChild(arrow);
-    overlay.appendChild(wrap);
-    labelEls[group] = wrap;
-  });
-
-  let currentTheta = 0, isDragging = false, activeGroup = null;
-  let freezeTimer = null, inactivityTimer = null;
   let glowFrame = null, glowPhase = 0;
-
-  const getTheta = () => { try { const o = mv.getCameraOrbit(); return o ? o.theta * 180 / Math.PI : currentTheta; } catch { return currentTheta; } };
-  const setOrbit = theta => { currentTheta = theta; mv.cameraOrbit = `${theta}deg 90deg auto`; };
+  let inactivityTimer = null;
 
   const stopGlow = () => {
     if (glowFrame) { cancelAnimationFrame(glowFrame); glowFrame = null; }
@@ -1650,92 +1601,85 @@ function initAnalyticsMuscleViewer() {
     const tick = () => {
       glowPhase += 0.07;
       const t = (Math.sin(glowPhase) + 1) / 2;
-      if (mv.model) {
-        mv.model.materials.forEach(mat => {
-          if (mat.name === group) {
-            const c = base.map(v => Math.min(1, v + t * 0.55));
-            mat.pbrMetallicRoughness.setBaseColorFactor([...c, 1.0]);
-          }
-        });
-      }
+      if (mv.model) mv.model.materials.forEach(mat => {
+        if (mat.name === group)
+          mat.pbrMetallicRoughness.setBaseColorFactor([...base.map(v => Math.min(1, v + t * 0.55)), 1.0]);
+      });
       glowFrame = requestAnimationFrame(tick);
     };
     tick();
   };
 
-  const hideAll = () => {
-    Object.values(labelEls).forEach(el => { el.style.opacity = '0'; el.style.pointerEvents = 'none'; });
-    stopGlow();
-    activeGroup = null;
-  };
+  // Exposed for selectMuscleGroup
+  state._muscleGlow = { start: startGlow, stop: stopGlow };
 
-  const resumeAutoRotate = () => { hideAll(); mv.setAttribute('auto-rotate', ''); };
-
-  const activateGroup = group => {
-    activeGroup = group;
-    mv.removeAttribute('auto-rotate');
-    Object.entries(labelEls).forEach(([g, el]) => {
-      const on = g === group;
-      el.style.opacity = on ? '1' : '0';
-      el.style.pointerEvents = on ? 'auto' : 'none';
-    });
-    startGlow(group);
-    if (freezeTimer) clearTimeout(freezeTimer);
-    if (inactivityTimer) clearTimeout(inactivityTimer);
-    freezeTimer = setTimeout(resumeAutoRotate, 5000);
-  };
-
-  const resetInactivity = () => {
-    if (inactivityTimer) clearTimeout(inactivityTimer);
-    if (freezeTimer) clearTimeout(freezeTimer);
-    hideAll();
-    inactivityTimer = setTimeout(resumeAutoRotate, 4000);
-  };
-
-  // model-viewer normalizes the model so max dimension = 1.0
-  // After GLTF Y-up transform: Y=-0.5 (feet) to +0.5 (head), X=±0.23 (lateral), Z=±0.09 (depth)
-  const detectMuscleFrom3D = (pos, normal) => {
-    const y = pos.y;
-    const absX = Math.abs(pos.x);
-    const isFront = pos.z > 0;
-
-    if (y > 0.40 || y < -0.44) return null;           // head / feet
-    if (absX > 0.13) {
-      if (y > 0.26)  return 'Shoulders';
-      if (y > -0.05) return isFront ? 'Biceps' : 'Triceps';
-      return null;                                     // forearm / wrist / hand
-    }
-    if (y > 0.14) return isFront ? 'Chest' : 'Back';
-    if (y > -0.08) return isFront ? 'Core' : 'Back';
-    return 'Legs';
-  };
-
-  // camera-change fires on any orbit/zoom interaction — use it to distinguish drag from tap
-  let cameraMovedSincePress = false;
-  mv.addEventListener('camera-change', () => { cameraMovedSincePress = true; });
-
+  // Auto-rotate management: stop on touch/drag, resume after 4s inactivity
   mv.addEventListener('pointerdown', () => {
-    cameraMovedSincePress = false;
     mv.removeAttribute('auto-rotate');
-    if (freezeTimer) clearTimeout(freezeTimer);
     if (inactivityTimer) clearTimeout(inactivityTimer);
   });
-
   mv.addEventListener('pointerup', () => {
-    if (cameraMovedSincePress) resetInactivity();
+    if (inactivityTimer) clearTimeout(inactivityTimer);
+    inactivityTimer = setTimeout(() => mv.setAttribute('auto-rotate', ''), 4000);
+  });
+}
+
+function selectMuscleGroup(group) {
+  const status = getMuscleTrainingStatus();
+  const modelArea = document.getElementById('muscleModelArea');
+  const exPanel  = document.getElementById('muscleExPanel');
+  if (!modelArea || !exPanel) return;
+
+  const already = state._activeMuscleGroup === group;
+
+  // Deselect
+  if (already) {
+    state._activeMuscleGroup = null;
+    if (state._muscleGlow) state._muscleGlow.stop();
+    modelArea.style.flex = '1';
+    exPanel.style.width = '0';
+    exPanel.style.opacity = '0';
+    document.querySelectorAll('.muscle-chip').forEach(b => b.style.outline = 'none');
+    return;
+  }
+
+  // Select new group
+  state._activeMuscleGroup = group;
+  if (state._muscleGlow) state._muscleGlow.start(group);
+
+  // Highlight chip
+  document.querySelectorAll('.muscle-chip').forEach(b => {
+    b.style.outline = b.dataset.group === group ? `2px solid #fff` : 'none';
   });
 
-  mv.addEventListener('click', e => {
-    if (cameraMovedSincePress) return;
-    currentTheta = getTheta();
-    const rect = mv.getBoundingClientRect();
-    const px = e.clientX - rect.left, py = e.clientY - rect.top;
-    let hit = null;
-    try { hit = mv.positionAndNormalFromPoint(px, py); } catch {}
-    const group = hit ? detectMuscleFrom3D(hit.position, hit.normal) : null;
-    if (group) activateGroup(group);
-    else { hideAll(); mv.setAttribute('auto-rotate', ''); }
-  });
+  // Slide model left, show panel
+  modelArea.style.flex = '0 0 42%';
+  exPanel.style.width = '58%';
+  exPanel.style.opacity = '1';
+
+  const n = status[group] || 0;
+  const col = muscleFreqColor(n).hex;
+  const lastStr = n === 0 ? 'Nicht trainiert (4 Wochen)'
+                : n >= 8  ? `${n}× — super (2+/Woche)`
+                : n >= 4  ? `${n}× — ok (1+/Woche)`
+                :           `${n}× — mehr trainieren`;
+  const exercises = getAllExercises().filter(e => e.group === group);
+
+  exPanel.innerHTML = `
+    <div style="padding:10px 8px 10px 10px;overflow-y:auto;height:100%;box-sizing:border-box">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <span style="color:${col};font-weight:700;font-size:13px">${group}</span>
+        <button onclick="selectMuscleGroup('${group}')" style="background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer;padding:0 2px">×</button>
+      </div>
+      <div style="font-size:10px;color:var(--text3);margin-bottom:8px">${lastStr}</div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        ${exercises.map(ex => `
+          <div style="background:var(--card);border-radius:8px;padding:7px 8px;font-size:11px;display:flex;align-items:center;gap:6px">
+            <span style="width:5px;height:5px;border-radius:50%;background:${col};flex-shrink:0"></span>
+            <span style="line-height:1.3">${esc(ex.name)}</span>
+          </div>`).join('')}
+      </div>
+    </div>`;
 }
 
 function showMuscleGroupOverlay(group) {
@@ -1999,37 +1943,39 @@ function renderAnalytics() {
     </div>
 
     <div class="chart-card" style="padding:0;overflow:hidden;margin-top:10px">
-      <div style="position:relative;height:420px">
-        <model-viewer
-          id="analyticsMV"
-          src="male_muscles_named.glb"
-          camera-controls
-          disable-pan
-          interaction-prompt="none"
-          auto-rotate
-          rotation-per-second="15deg"
-          auto-rotate-delay="0"
-          camera-orbit="0deg 90deg auto"
-          camera-target="auto"
-          field-of-view="75deg"
-          min-camera-orbit="auto 90deg auto"
-          max-camera-orbit="auto 90deg auto"
-          min-field-of-view="30deg"
-          max-field-of-view="120deg"
-          environment-image="neutral"
-          exposure="1.6"
-          tone-mapping="neutral"
-          style="width:100%;height:100%;background:transparent;--progress-bar-color:var(--accent);cursor:pointer"
-          loading="eager"
-        ></model-viewer>
-        <div id="analyticsMuscleOverlay" style="position:absolute;inset:0;pointer-events:none;overflow:hidden"></div>
+      <div style="display:flex;height:380px;transition:all .3s">
+        <div id="muscleModelArea" style="flex:1;min-width:0;transition:flex .3s;position:relative">
+          <model-viewer
+            id="analyticsMV"
+            src="male_muscles_named.glb"
+            camera-controls
+            disable-pan
+            interaction-prompt="none"
+            auto-rotate
+            rotation-per-second="15deg"
+            auto-rotate-delay="0"
+            camera-orbit="0deg 90deg auto"
+            camera-target="auto"
+            field-of-view="75deg"
+            min-camera-orbit="auto 90deg auto"
+            max-camera-orbit="auto 90deg auto"
+            min-field-of-view="30deg"
+            max-field-of-view="120deg"
+            environment-image="neutral"
+            exposure="1.6"
+            tone-mapping="neutral"
+            style="width:100%;height:100%;background:transparent;--progress-bar-color:var(--accent)"
+            loading="eager"
+          ></model-viewer>
+        </div>
+        <div id="muscleExPanel" style="width:0;opacity:0;overflow:hidden;transition:width .3s,opacity .3s;background:var(--bg2);border-left:1px solid var(--border)"></div>
       </div>
       <div style="padding:8px 12px 12px;display:flex;flex-wrap:wrap;gap:6px;border-top:1px solid var(--border)">
         ${MUSCLE_GROUPS.map(g => {
           const col = muscleStatusColor(g, muscleStatus);
           const n = muscleStatus[g] || 0;
           const tag = n === 0 ? '' : ` · ${n}×`;
-          return `<button onclick="showMuscleGroupOverlay('${g}')" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;background:${col};color:#fff;border:none;cursor:pointer;letter-spacing:.03em">${g}${tag}</button>`;
+          return `<button class="muscle-chip" data-group="${g}" onclick="selectMuscleGroup('${g}')" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;background:${col};color:#fff;border:none;cursor:pointer;letter-spacing:.03em;outline:none;transition:outline .15s">${g}${tag}</button>`;
         }).join('')}
       </div>
     </div>
