@@ -1583,8 +1583,6 @@ function initAnalyticsMuscleViewer() {
   if (!mv || !overlay) return;
 
   const status = getMuscleTrainingStatus();
-
-  // Color named mesh materials on load (or immediately if already loaded)
   const applyColors = () => colorMuscleModel(mv, status);
   if (mv.model) applyColors();
   else mv.addEventListener('load', applyColors, { once: true });
@@ -1608,10 +1606,10 @@ function initAnalyticsMuscleViewer() {
       'position:absolute', `left:${x}%`, `top:${y}%`, 'transform:translate(-50%,-50%)',
       `background:${col}cc`, 'color:#fff', `border:1.5px solid ${col}`,
       'border-radius:20px', 'padding:4px 11px', 'font-size:11px', 'font-weight:700',
-      'letter-spacing:.05em', 'cursor:pointer', 'pointer-events:auto',
+      'letter-spacing:.05em', 'cursor:pointer', 'pointer-events:none',
       'backdrop-filter:blur(6px)', '-webkit-backdrop-filter:blur(6px)',
       'text-shadow:0 1px 3px rgba(0,0,0,.6)', 'white-space:nowrap',
-      'transition:opacity .15s', 'line-height:1.4',
+      'transition:opacity .2s', 'line-height:1.4', 'opacity:0',
     ].join(';');
     btn.textContent = group.toUpperCase();
     btn.addEventListener('click', e => { e.stopPropagation(); showMuscleGroupOverlay(group); });
@@ -1619,7 +1617,10 @@ function initAnalyticsMuscleViewer() {
     return btn;
   });
 
-  let currentTheta = 0, interacting = false;
+  let currentTheta = 0, frozen = false, isDragging = false;
+  let freezeTimer = null, inactivityTimer = null;
+
+  const getTheta = () => { try { const o = mv.getCameraOrbit(); return o ? o.theta * 180 / Math.PI : currentTheta; } catch { return currentTheta; } };
 
   const updateLabels = theta => {
     currentTheta = theta;
@@ -1628,39 +1629,75 @@ function initAnalyticsMuscleViewer() {
     labelEls.forEach(el => {
       const side = el.dataset.side;
       const op = side === 'both' ? 1 : side === 'front' ? Math.max(0, fc) : Math.max(0, -fc);
-      el.style.opacity = op;
-      el.style.pointerEvents = op > 0.25 ? 'auto' : 'none';
+      el.style.opacity = frozen ? op : 0;
+      el.style.pointerEvents = (frozen && op > 0.25) ? 'auto' : 'none';
     });
   };
 
-  const enterInteract = () => {
-    if (interacting) return;
-    interacting = true;
-    mv.removeAttribute('auto-rotate');
-    try { const o = mv.getCameraOrbit(); if (o) currentTheta = o.theta * 180 / Math.PI; } catch {}
-    overlay.style.opacity = '1';
+  const setOrbit = theta => { mv.cameraOrbit = `${theta}deg 90deg auto`; updateLabels(theta); };
+
+  const resumeAutoRotate = () => {
+    frozen = false;
+    mv.setAttribute('auto-rotate', '');
     updateLabels(currentTheta);
-    const hint = document.getElementById('analyticsTapHint');
-    if (hint) { hint.style.opacity = '0'; setTimeout(() => hint.remove(), 600); }
   };
 
-  mv.addEventListener('click', enterInteract);
+  const freeze = () => {
+    frozen = true;
+    mv.removeAttribute('auto-rotate');
+    currentTheta = getTheta();
+    updateLabels(currentTheta);
+    if (freezeTimer) clearTimeout(freezeTimer);
+    if (inactivityTimer) clearTimeout(inactivityTimer);
+    freezeTimer = setTimeout(resumeAutoRotate, 5000);
+  };
 
-  let startX = 0, startTheta = 0, dragging = false;
-  const getTheta = () => { try { const o = mv.getCameraOrbit(); return o ? o.theta * 180 / Math.PI : currentTheta; } catch { return currentTheta; } };
-  const setOrbit = theta => { mv.cameraOrbit = `${theta}deg 90deg auto`; if (interacting) updateLabels(theta); };
+  const resetInactivity = () => {
+    if (inactivityTimer) clearTimeout(inactivityTimer);
+    if (freezeTimer) clearTimeout(freezeTimer);
+    frozen = false;
+    updateLabels(currentTheta);
+    inactivityTimer = setTimeout(resumeAutoRotate, 4000);
+  };
 
-  mv.addEventListener('touchstart', e => { startX = e.touches[0].clientX; startTheta = getTheta(); dragging = true; }, { passive: true });
+  mv.addEventListener('click', () => { if (!isDragging) freeze(); });
+
+  let startX = 0, startTheta = 0;
+
+  mv.addEventListener('touchstart', e => {
+    startX = e.touches[0].clientX; startTheta = getTheta(); isDragging = false;
+    mv.removeAttribute('auto-rotate');
+    if (freezeTimer) clearTimeout(freezeTimer);
+    if (inactivityTimer) clearTimeout(inactivityTimer);
+  }, { passive: true });
   mv.addEventListener('touchmove', e => {
-    if (!dragging) return;
-    if (Math.abs(e.touches[0].clientX - startX) > 6) { enterInteract(); e.preventDefault(); setOrbit(startTheta - (e.touches[0].clientX - startX) * 0.4); }
+    if (Math.abs(e.touches[0].clientX - startX) > 6) {
+      isDragging = true; e.preventDefault();
+      setOrbit(startTheta - (e.touches[0].clientX - startX) * 0.4);
+    }
   }, { passive: false });
-  mv.addEventListener('touchend', () => { dragging = false; });
+  mv.addEventListener('touchend', () => {
+    if (isDragging) resetInactivity();
+    setTimeout(() => { isDragging = false; }, 50);
+  });
+
   mv.addEventListener('mousedown', e => {
-    startX = e.clientX; startTheta = getTheta(); dragging = true; e.preventDefault();
-    const onMove = ev => { if (dragging && Math.abs(ev.clientX - startX) > 4) { enterInteract(); setOrbit(startTheta - (ev.clientX - startX) * 0.4); } };
+    startX = e.clientX; startTheta = getTheta(); isDragging = false; e.preventDefault();
+    mv.removeAttribute('auto-rotate');
+    if (freezeTimer) clearTimeout(freezeTimer);
+    if (inactivityTimer) clearTimeout(inactivityTimer);
+    const onMove = ev => {
+      if (Math.abs(ev.clientX - startX) > 4) {
+        isDragging = true;
+        setOrbit(startTheta - (ev.clientX - startX) * 0.4);
+      }
+    };
     document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', () => { dragging = false; document.removeEventListener('mousemove', onMove); }, { once: true });
+    document.addEventListener('mouseup', () => {
+      document.removeEventListener('mousemove', onMove);
+      if (isDragging) resetInactivity();
+      setTimeout(() => { isDragging = false; }, 50);
+    }, { once: true });
   });
 }
 
@@ -1938,8 +1975,7 @@ function renderAnalytics() {
           style="width:100%;height:100%;background:transparent;--progress-bar-color:var(--accent);touch-action:none;cursor:pointer"
           loading="eager"
         ></model-viewer>
-        <div id="analyticsMuscleOverlay" style="position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity 0.3s"></div>
-        <div id="analyticsTapHint" style="position:absolute;bottom:10px;left:0;right:0;text-align:center;color:rgba(255,255,255,.38);font-size:11px;pointer-events:none;letter-spacing:.08em">TAP TO INTERACT</div>
+        <div id="analyticsMuscleOverlay" style="position:absolute;inset:0;pointer-events:none"></div>
       </div>
       <div style="padding:8px 12px 12px;display:flex;flex-wrap:wrap;gap:6px;border-top:1px solid var(--border)">
         ${MUSCLE_GROUPS.map(g => {
