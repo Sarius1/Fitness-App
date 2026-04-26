@@ -1587,66 +1587,99 @@ function initAnalyticsMuscleViewer() {
   if (mv.model) applyColors();
   else mv.addEventListener('load', applyColors, { once: true });
 
+  // [group, side, y%] — labels positioned outside the body silhouette
   const LABEL_DEFS = [
-    ['Chest',     48, 30, 'front'],
-    ['Shoulders', 22, 20, 'front'],
-    ['Biceps',    10, 38, 'front'],
-    ['Core',      48, 45, 'front'],
-    ['Legs',      48, 65, 'both' ],
-    ['Back',      48, 30, 'back' ],
-    ['Triceps',   10, 38, 'back' ],
+    ['Shoulders', 'left',  22],
+    ['Back',      'left',  33],
+    ['Triceps',   'left',  45],
+    ['Chest',     'right', 33],
+    ['Biceps',    'right', 45],
+    ['Core',      'right', 54],
+    ['Legs',      'right', 68],
   ];
-  const muscleColor = g => muscleFreqColor(status[g] || 0).hex;
 
-  const labelEls = LABEL_DEFS.map(([group, x, y, side]) => {
-    const col = muscleColor(group);
-    const btn = document.createElement('button');
-    btn.dataset.group = group; btn.dataset.side = side;
-    btn.style.cssText = [
-      'position:absolute', `left:${x}%`, `top:${y}%`, 'transform:translate(-50%,-50%)',
-      `background:${col}cc`, 'color:#fff', `border:1.5px solid ${col}`,
-      'border-radius:20px', 'padding:4px 11px', 'font-size:11px', 'font-weight:700',
-      'letter-spacing:.05em', 'cursor:pointer', 'pointer-events:none',
-      'backdrop-filter:blur(6px)', '-webkit-backdrop-filter:blur(6px)',
-      'text-shadow:0 1px 3px rgba(0,0,0,.6)', 'white-space:nowrap',
-      'transition:opacity .2s', 'line-height:1.4', 'opacity:0',
+  const labelEls = {};
+  LABEL_DEFS.forEach(([group, side, y]) => {
+    const col = muscleFreqColor(status[group] || 0).hex;
+    const isLeft = side === 'left';
+    const wrap = document.createElement('div');
+    wrap.style.cssText = [
+      'position:absolute', isLeft ? 'left:4px' : 'right:4px', `top:${y}%`,
+      'transform:translateY(-50%)', 'display:flex', 'align-items:center', 'gap:3px',
+      'flex-direction:' + (isLeft ? 'row' : 'row-reverse'),
+      'opacity:0', 'transition:opacity .2s', 'pointer-events:none',
     ].join(';');
-    btn.textContent = group.toUpperCase();
-    btn.addEventListener('click', e => { e.stopPropagation(); showMuscleGroupOverlay(group); });
-    overlay.appendChild(btn);
-    return btn;
+
+    const pill = document.createElement('button');
+    pill.style.cssText = [
+      `background:${col}ee`, 'color:#fff', `border:1.5px solid ${col}`,
+      'border-radius:20px', 'padding:3px 9px', 'font-size:10px', 'font-weight:700',
+      'letter-spacing:.05em', 'cursor:pointer', 'pointer-events:auto',
+      'backdrop-filter:blur(6px)', 'text-shadow:0 1px 3px rgba(0,0,0,.7)',
+      'white-space:nowrap', 'line-height:1.5',
+    ].join(';');
+    pill.textContent = group.toUpperCase();
+    pill.addEventListener('click', e => { e.stopPropagation(); showMuscleGroupOverlay(group); });
+
+    const arrow = document.createElement('span');
+    arrow.style.cssText = 'color:rgba(255,255,255,.55);font-size:11px;line-height:1;flex-shrink:0';
+    arrow.textContent = isLeft ? '→' : '←';
+
+    wrap.appendChild(pill);
+    wrap.appendChild(arrow);
+    overlay.appendChild(wrap);
+    labelEls[group] = wrap;
   });
 
-  let currentTheta = 0, frozen = false, isDragging = false;
+  let currentTheta = 0, isDragging = false, activeGroup = null;
   let freezeTimer = null, inactivityTimer = null;
+  let glowFrame = null, glowPhase = 0;
 
   const getTheta = () => { try { const o = mv.getCameraOrbit(); return o ? o.theta * 180 / Math.PI : currentTheta; } catch { return currentTheta; } };
+  const setOrbit = theta => { currentTheta = theta; mv.cameraOrbit = `${theta}deg 90deg auto`; };
 
-  const updateLabels = theta => {
-    currentTheta = theta;
-    const rad = (((theta % 360) + 360) % 360) * Math.PI / 180;
-    const fc = Math.cos(rad);
-    labelEls.forEach(el => {
-      const side = el.dataset.side;
-      const op = side === 'both' ? 1 : side === 'front' ? Math.max(0, fc) : Math.max(0, -fc);
-      el.style.opacity = frozen ? op : 0;
-      el.style.pointerEvents = (frozen && op > 0.25) ? 'auto' : 'none';
-    });
+  const stopGlow = () => {
+    if (glowFrame) { cancelAnimationFrame(glowFrame); glowFrame = null; }
+    if (mv.model) colorMuscleModel(mv, status);
   };
 
-  const setOrbit = theta => { mv.cameraOrbit = `${theta}deg 90deg auto`; updateLabels(theta); };
-
-  const resumeAutoRotate = () => {
-    frozen = false;
-    mv.setAttribute('auto-rotate', '');
-    updateLabels(currentTheta);
+  const startGlow = group => {
+    stopGlow();
+    const base = muscleFreqColor(status[group] || 0).rgb;
+    glowPhase = 0;
+    const tick = () => {
+      glowPhase += 0.07;
+      const t = (Math.sin(glowPhase) + 1) / 2;
+      if (mv.model) {
+        mv.model.materials.forEach(mat => {
+          if (mat.name === group) {
+            const c = base.map(v => Math.min(1, v + t * 0.55));
+            mat.pbrMetallicRoughness.setBaseColorFactor([...c, 1.0]);
+          }
+        });
+      }
+      glowFrame = requestAnimationFrame(tick);
+    };
+    tick();
   };
 
-  const freeze = () => {
-    frozen = true;
+  const hideAll = () => {
+    Object.values(labelEls).forEach(el => { el.style.opacity = '0'; el.style.pointerEvents = 'none'; });
+    stopGlow();
+    activeGroup = null;
+  };
+
+  const resumeAutoRotate = () => { hideAll(); mv.setAttribute('auto-rotate', ''); };
+
+  const activateGroup = group => {
+    activeGroup = group;
     mv.removeAttribute('auto-rotate');
-    currentTheta = getTheta();
-    updateLabels(currentTheta);
+    Object.entries(labelEls).forEach(([g, el]) => {
+      const on = g === group;
+      el.style.opacity = on ? '1' : '0';
+      el.style.pointerEvents = on ? 'auto' : 'none';
+    });
+    startGlow(group);
     if (freezeTimer) clearTimeout(freezeTimer);
     if (inactivityTimer) clearTimeout(inactivityTimer);
     freezeTimer = setTimeout(resumeAutoRotate, 5000);
@@ -1655,12 +1688,32 @@ function initAnalyticsMuscleViewer() {
   const resetInactivity = () => {
     if (inactivityTimer) clearTimeout(inactivityTimer);
     if (freezeTimer) clearTimeout(freezeTimer);
-    frozen = false;
-    updateLabels(currentTheta);
+    hideAll();
     inactivityTimer = setTimeout(resumeAutoRotate, 4000);
   };
 
-  mv.addEventListener('click', () => { if (!isDragging) freeze(); });
+  const detectMuscle = (relX, relY) => {
+    const isFront = Math.cos(((currentTheta % 360 + 360) % 360) * Math.PI / 180) > 0;
+    const isCenter = relX > 0.28 && relX < 0.72;
+    if (relY < 0.10 || relY > 0.92) return null;
+    if (relY < 0.35) {
+      if (!isCenter) return 'Shoulders';
+      return isFront ? 'Chest' : 'Back';
+    }
+    if (relY < 0.58) {
+      if (!isCenter) return isFront ? 'Biceps' : 'Triceps';
+      return isFront ? 'Core' : 'Back';
+    }
+    return 'Legs';
+  };
+
+  mv.addEventListener('click', e => {
+    if (isDragging) return;
+    currentTheta = getTheta();
+    const rect = mv.getBoundingClientRect();
+    const group = detectMuscle((e.clientX - rect.left) / rect.width, (e.clientY - rect.top) / rect.height);
+    if (group) activateGroup(group);
+  });
 
   let startX = 0, startTheta = 0;
 
@@ -1687,10 +1740,7 @@ function initAnalyticsMuscleViewer() {
     if (freezeTimer) clearTimeout(freezeTimer);
     if (inactivityTimer) clearTimeout(inactivityTimer);
     const onMove = ev => {
-      if (Math.abs(ev.clientX - startX) > 4) {
-        isDragging = true;
-        setOrbit(startTheta - (ev.clientX - startX) * 0.4);
-      }
+      if (Math.abs(ev.clientX - startX) > 4) { isDragging = true; setOrbit(startTheta - (ev.clientX - startX) * 0.4); }
     };
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', () => {
@@ -1962,7 +2012,7 @@ function renderAnalytics() {
     </div>
 
     <div class="chart-card" style="padding:0;overflow:hidden;margin-top:10px">
-      <div style="position:relative;height:340px">
+      <div style="position:relative;height:420px">
         <model-viewer
           id="analyticsMV"
           src="male_muscles_named.glb"
@@ -1971,11 +2021,11 @@ function renderAnalytics() {
           auto-rotate-delay="0"
           camera-orbit="0deg 90deg auto"
           camera-target="auto"
-          field-of-view="110deg"
+          field-of-view="120deg"
           style="width:100%;height:100%;background:transparent;--progress-bar-color:var(--accent);touch-action:none;cursor:pointer"
           loading="eager"
         ></model-viewer>
-        <div id="analyticsMuscleOverlay" style="position:absolute;inset:0;pointer-events:none"></div>
+        <div id="analyticsMuscleOverlay" style="position:absolute;inset:0;pointer-events:none;overflow:hidden"></div>
       </div>
       <div style="padding:8px 12px 12px;display:flex;flex-wrap:wrap;gap:6px;border-top:1px solid var(--border)">
         ${MUSCLE_GROUPS.map(g => {
