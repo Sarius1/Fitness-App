@@ -2024,11 +2024,12 @@ function renderAnalytics() {
           auto-rotate
           rotation-per-second="15deg"
           auto-rotate-delay="0"
-          camera-orbit="0deg 90deg auto"
+          camera-orbit="0deg 90deg 200%"
           camera-target="auto"
-          field-of-view="140deg"
+          field-of-view="75deg"
           environment-image="neutral"
-          exposure="1.1"
+          exposure="1.6"
+          tone-mapping="neutral"
           style="width:100%;height:100%;background:transparent;--progress-bar-color:var(--accent);touch-action:none;cursor:pointer"
           loading="eager"
         ></model-viewer>
