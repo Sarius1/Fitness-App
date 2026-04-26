@@ -1692,17 +1692,21 @@ function initAnalyticsMuscleViewer() {
     inactivityTimer = setTimeout(resumeAutoRotate, 4000);
   };
 
-  // 3D muscle detection — model bounds: Y=-8..+7.9 (height), X=-3.6..+3.6, Z=-1.7..+1.7
-  // pos.z > 0 = front half of body (chest/abs side), < 0 = back side
+  // model-viewer normalizes the model so max dimension = 1.0
+  // After GLTF Y-up transform: Y=-0.5 (feet) to +0.5 (head), X=±0.23 (lateral), Z=±0.09 (depth)
   const detectMuscleFrom3D = (pos, normal) => {
     const y = pos.y;
     const absX = Math.abs(pos.x);
     const isFront = pos.z > 0;
 
-    if (y > 6.2 || y < -6.5) return null;                            // head / feet
-    if (absX > 1.8) return y > 4.5 ? 'Shoulders' : isFront ? 'Biceps' : 'Triceps';
-    if (y > 1.5)  return isFront ? 'Chest' : 'Back';
-    if (y > -2.0) return isFront ? 'Core' : 'Back';
+    if (y > 0.40 || y < -0.44) return null;           // head / feet
+    if (absX > 0.13) {
+      if (y > 0.26)  return 'Shoulders';
+      if (y > -0.05) return isFront ? 'Biceps' : 'Triceps';
+      return null;                                     // forearm / wrist / hand
+    }
+    if (y > 0.14) return isFront ? 'Chest' : 'Back';
+    if (y > -0.08) return isFront ? 'Core' : 'Back';
     return 'Legs';
   };
 
