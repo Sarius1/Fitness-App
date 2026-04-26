@@ -1711,6 +1711,11 @@ function initAnalyticsMuscleViewer() {
     if (isDragging) return;
     currentTheta = getTheta();
     const rect = mv.getBoundingClientRect();
+    const px = e.clientX - rect.left, py = e.clientY - rect.top;
+    // Only activate if click actually hit the 3D model (not black background)
+    let hit = null;
+    try { hit = mv.positionAndNormalFromPoint(px, py); } catch {}
+    if (!hit) return;
     const group = detectMuscle((e.clientX - rect.left) / rect.width, (e.clientY - rect.top) / rect.height);
     if (group) activateGroup(group);
   });
@@ -2022,6 +2027,8 @@ function renderAnalytics() {
           camera-orbit="0deg 90deg auto"
           camera-target="auto"
           field-of-view="120deg"
+          environment-image="neutral"
+          exposure="1.1"
           style="width:100%;height:100%;background:transparent;--progress-bar-color:var(--accent);touch-action:none;cursor:pointer"
           loading="eager"
         ></model-viewer>
