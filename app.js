@@ -257,6 +257,8 @@ function renderNutrition() {
   const goals = getGoals();
   const t = todayStr();
 
+  const suppls = getSupplements();
+  const supplLog = suppls.length ? getSupplLog() : {};
   let cells = ['Su','Mo','Tu','We','Th','Fr','Sa'].map(d=>`<div class="cal-dow">${d}</div>`).join('');
   for (let i = 0; i < firstDOW; i++) cells += `<div class="cal-day empty"></div>`;
   for (let d = 1; d <= days; d++) {
@@ -270,6 +272,13 @@ function renderNutrition() {
     const sd = getSplitDayForDate(ds);
     const sdCol = sd ? splitDayColor(sd) : null;
     const sdBadge = sd ? `<div class="cal-split-badge" style="background:${sdCol}22;color:${sdCol}">${esc(sd.label)}</div>` : '';
+    const daySupplLog = supplLog[ds] || {};
+    const takenSuppl = suppls.filter(s => daySupplLog[s.id]);
+    const supplDots = takenSuppl.length
+      ? `<div style="display:flex;gap:1px;flex-wrap:wrap;margin-top:2px">${takenSuppl.map(() =>
+          `<svg viewBox="0 0 8 8" width="6" height="6"><polyline points="1,4 3,6 7,2" stroke="#22c55e" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+        ).join('')}</div>`
+      : '';
     cells += `<div class="cal-day${ds===t?' today':''}" onclick="openDayView('${ds}')">
       <div class="cal-day-num">${d}</div>
       ${sdBadge}
@@ -277,6 +286,7 @@ function renderNutrition() {
         <div class="cal-mini-bar"><div class="cal-mini-bar-fill" style="width:${has?cpct:0}%;background:${cc}"></div></div>
         <div class="cal-mini-bar"><div class="cal-mini-bar-fill" style="width:${has?ppct:0}%;background:${pc}"></div></div>
       </div>
+      ${supplDots}
     </div>`;
   }
 
@@ -1002,7 +1012,7 @@ function renderExPicker(planId, mode) {
     const sel = state.pickerSelected.includes(e.id);
     const col = GROUP_COLORS[e.group] || '#888';
     const abbr = e.group.substring(0,2).toUpperCase();
-    return `<div class="ex-row${sel?' selected':''}" onclick="toggleEx('${e.id}','${planId}','${mode}')">
+    return `<div class="ex-row${sel?' selected':''}" data-exid="${e.id}" onclick="toggleEx('${e.id}','${planId}','${mode}')">
       <div class="ex-badge" style="background:${col}">${abbr}</div>
       <div style="flex:1"><div class="ex-row-name">${esc(e.name)}</div><div class="ex-row-group">${esc(e.group)}</div></div>
       <div class="ex-check">${sel?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" width="12" height="12"><polyline points="20 6 9 17 4 12"/></svg>':''}</div>
@@ -1033,7 +1043,16 @@ function setExGroup(g, planId, mode) { state.exPickerGroup = g; renderExPicker(p
 function toggleEx(id, planId, mode) {
   const i = state.pickerSelected.indexOf(id);
   if (i >= 0) state.pickerSelected.splice(i,1); else state.pickerSelected.push(id);
-  renderExPicker(planId, mode);
+  const sel = state.pickerSelected.includes(id);
+  const row = document.querySelector(`.ex-row[data-exid="${id}"]`);
+  if (row) {
+    row.classList.toggle('selected', sel);
+    row.querySelector('.ex-check').innerHTML = sel
+      ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" width="12" height="12"><polyline points="20 6 9 17 4 12"/></svg>'
+      : '';
+  }
+  const title = document.querySelector('.panel-title');
+  if (title) title.textContent = `${state.pickerSelected.length} selected`;
 }
 
 function openCustomEx(planId, mode) {
