@@ -1692,19 +1692,21 @@ function initAnalyticsMuscleViewer() {
     inactivityTimer = setTimeout(resumeAutoRotate, 4000);
   };
 
-  const detectMuscle = (relX, relY) => {
-    const isFront = Math.cos(((currentTheta % 360 + 360) % 360) * Math.PI / 180) > 0;
-    const isCenter = relX > 0.28 && relX < 0.72;
-    if (relY < 0.10 || relY > 0.92) return null;
-    if (relY < 0.35) {
-      if (!isCenter) return 'Shoulders';
-      return isFront ? 'Chest' : 'Back';
-    }
-    if (relY < 0.58) {
-      if (!isCenter) return isFront ? 'Biceps' : 'Triceps';
-      return isFront ? 'Core' : 'Back';
-    }
-    return 'Legs';
+  // Precise 3D muscle detection using model-viewer hit coordinates
+  // Model world bounds (after GLTF root transform): Y=-8..+7.88 (height), X=-3.6..+3.6, Z=-1.7..+1.7
+  const detectMuscleFrom3D = (pos, normal) => {
+    const y = pos.y;               // height: ~-8 feet → ~+7.9 head
+    const absX = Math.abs(pos.x);  // lateral: 0 = center, ~3.6 = edge
+    const isFront = normal.z > 0;  // surface normal toward camera = front face
+
+    if (y > 6.2)  return null;     // head
+    if (y < -6.5) return null;     // feet/floor
+    if (y > 4.8 && absX > 1.4) return 'Shoulders';
+    if (y > 4.0 && absX < 1.8) return isFront ? 'Chest' : 'Back';
+    if (y > 0.5 && absX > 1.4) return isFront ? 'Biceps' : 'Triceps';
+    if (y > 0.5 && absX < 1.8) return isFront ? 'Core' : 'Back';
+    if (y > -6.5) return 'Legs';
+    return null;
   };
 
   mv.addEventListener('click', e => {
@@ -1712,11 +1714,10 @@ function initAnalyticsMuscleViewer() {
     currentTheta = getTheta();
     const rect = mv.getBoundingClientRect();
     const px = e.clientX - rect.left, py = e.clientY - rect.top;
-    // Only activate if click actually hit the 3D model (not black background)
     let hit = null;
     try { hit = mv.positionAndNormalFromPoint(px, py); } catch {}
     if (!hit) return;
-    const group = detectMuscle((e.clientX - rect.left) / rect.width, (e.clientY - rect.top) / rect.height);
+    const group = detectMuscleFrom3D(hit.position, hit.normal);
     if (group) activateGroup(group);
   });
 
@@ -2017,16 +2018,16 @@ function renderAnalytics() {
     </div>
 
     <div class="chart-card" style="padding:0;overflow:hidden;margin-top:10px">
-      <div style="position:relative;height:500px">
+      <div style="position:relative;height:560px">
         <model-viewer
           id="analyticsMV"
           src="male_muscles_named.glb"
           auto-rotate
           rotation-per-second="15deg"
           auto-rotate-delay="0"
-          camera-orbit="0deg 90deg 200%"
+          camera-orbit="0deg 90deg auto"
           camera-target="auto"
-          field-of-view="75deg"
+          field-of-view="100deg"
           environment-image="neutral"
           exposure="1.6"
           tone-mapping="neutral"
