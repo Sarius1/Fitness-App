@@ -1716,9 +1716,9 @@ function initAnalyticsMuscleViewer() {
     const px = e.clientX - rect.left, py = e.clientY - rect.top;
     let hit = null;
     try { hit = mv.positionAndNormalFromPoint(px, py); } catch {}
-    if (!hit) return;
-    const group = detectMuscleFrom3D(hit.position, hit.normal);
+    const group = hit ? detectMuscleFrom3D(hit.position, hit.normal) : null;
     if (group) activateGroup(group);
+    else { hideAll(); mv.setAttribute('auto-rotate', ''); }
   });
 
   let startX = 0, startTheta = 0;
@@ -2018,16 +2018,16 @@ function renderAnalytics() {
     </div>
 
     <div class="chart-card" style="padding:0;overflow:hidden;margin-top:10px">
-      <div style="position:relative;height:560px">
+      <div style="position:relative;height:420px">
         <model-viewer
           id="analyticsMV"
           src="male_muscles_named.glb"
           auto-rotate
           rotation-per-second="15deg"
           auto-rotate-delay="0"
-          camera-orbit="0deg 90deg auto"
+          camera-orbit="0deg 90deg 300%"
           camera-target="auto"
-          field-of-view="100deg"
+          field-of-view="75deg"
           environment-image="neutral"
           exposure="1.6"
           tone-mapping="neutral"
