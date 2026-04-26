@@ -9,6 +9,7 @@ const SK = {
   ACTIVE_WO: 'ft_active_wo', CUSTOM_EX: 'ft_custom_ex',
   SPLITS: 'ft_splits', ACTIVE_SPLIT: 'ft_active_split',
   REPEAT_MEALS: 'ft_rmeal',
+  SUPPLEMENTS: 'ft_suppl', SUPPL_LOG: 'ft_suppl_log',
 };
 const DEFAULT_GOALS = { calories: 2500, protein: 150, carbs: 300, fat: 70 };
 const GROUP_COLORS = {
@@ -281,6 +282,7 @@ function renderNutrition() {
 
   const nutView = state.nutritionView || 'calendar';
   const repeatMeals = getRepeatMeals();
+  const supplements = getSupplements();
 
   const repeatMealsHtml = repeatMeals.length
     ? repeatMeals.map(rm => `
@@ -295,10 +297,29 @@ function renderNutrition() {
         </div>`).join('')
     : `<div style="color:var(--text3);font-size:13px;padding:16px 0;text-align:center">Keine gespeicherten Mahlzeiten</div>`;
 
+  const supplHtml = supplements.length
+    ? supplements.map(s => `
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
+          <div style="flex:1">
+            <div style="font-weight:600;font-size:14px">${esc(s.name)}</div>
+            ${s.dose ? `<div style="font-size:11px;color:var(--text3)">${esc(s.dose)}</div>` : ''}
+          </div>
+          <button class="icon-btn" style="color:var(--danger)" onclick="deleteSupplement('${s.id}')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
+          </button>
+        </div>`).join('')
+    : `<div style="color:var(--text3);font-size:13px;padding:16px 0;text-align:center">Keine Supplements eingetragen</div>`;
+
+  const tabBtn = (view, label) => {
+    const active = nutView === view;
+    return `<button onclick="state.nutritionView='${view}';renderNutrition()" style="flex:1;padding:7px;border:none;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;background:${active?'var(--accent)':'transparent'};color:${active?'#fff':'var(--text2)'}">${label}</button>`;
+  };
+
   el.innerHTML = `
     <div style="display:flex;gap:0;margin-bottom:10px;background:var(--card);border-radius:12px;padding:3px">
-      <button onclick="state.nutritionView='calendar';renderNutrition()" style="flex:1;padding:7px;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;background:${nutView==='calendar'?'var(--accent)':'transparent'};color:${nutView==='calendar'?'#fff':'var(--text2)'}">Kalender</button>
-      <button onclick="state.nutritionView='meals';renderNutrition()" style="flex:1;padding:7px;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;background:${nutView==='meals'?'var(--accent)':'transparent'};color:${nutView==='meals'?'#fff':'var(--text2)'}">Gespeicherte Mahlzeiten</button>
+      ${tabBtn('calendar','Kalender')}
+      ${tabBtn('meals','Mahlzeiten')}
+      ${tabBtn('supplements','Supplements')}
     </div>
     ${nutView === 'calendar' ? `
     <div class="card card-sm">
@@ -324,12 +345,19 @@ function renderNutrition() {
         Goals
       </button>
       <button class="btn btn-primary btn-sm" style="flex:1" onclick="openDayView('${t}')">+ Log Today</button>
-    </div>` : `
+    </div>`
+    : nutView === 'meals' ? `
     <div class="card">
       <div class="card-title">Gespeicherte Mahlzeiten</div>
       ${repeatMealsHtml}
     </div>
-    <button class="btn btn-primary btn-full mt-8" onclick="openSaveRepeatMealModal()">+ Neue Mahlzeit speichern</button>`}
+    <button class="btn btn-primary btn-full mt-8" onclick="openSaveRepeatMealModal()">+ Neue Mahlzeit speichern</button>`
+    : `
+    <div class="card">
+      <div class="card-title">Supplements</div>
+      ${supplHtml}
+    </div>
+    <button class="btn btn-primary btn-full mt-8" onclick="openAddSupplementModal()">+ Supplement hinzufügen</button>`}
   `;
 }
 
@@ -438,6 +466,7 @@ function openDayView(dateStr) {
         ${foodsHtml}
       </div>
       <button class="btn btn-primary btn-full mt-12" onclick="openAddFoodModal('${dateStr}')">+ Add Food</button>
+      ${renderDaySupplements(dateStr)}
     </div>`);
 }
 
@@ -560,6 +589,75 @@ function submitRepeatMeal() {
 function deleteRepeatMeal(id) {
   save(SK.REPEAT_MEALS, getRepeatMeals().filter(m => m.id !== id));
   renderNutrition();
+}
+
+/* ── Supplements ────────────────────────────────────────── */
+function openAddSupplementModal() {
+  openOverlay(`
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="input-group">
+        <label class="input-label">Name</label>
+        <input class="input" id="suppl_name" type="text" placeholder="z.B. Vitamin D3">
+      </div>
+      <div class="input-group">
+        <label class="input-label">Dosierung (optional)</label>
+        <input class="input" id="suppl_dose" type="text" placeholder="z.B. 1000 IE, 2 Kapseln">
+      </div>
+      <button class="btn btn-primary btn-full" onclick="saveNewSupplement()">Speichern</button>
+    </div>`, 'Supplement hinzufügen');
+}
+
+function saveNewSupplement() {
+  const name = document.getElementById('suppl_name')?.value.trim();
+  if (!name) { showToast('Name eingeben'); return; }
+  const dose = document.getElementById('suppl_dose')?.value.trim() || null;
+  const suppl = getSupplements();
+  suppl.push({ id: uid(), name, dose });
+  save(SK.SUPPLEMENTS, suppl);
+  closeOverlay();
+  renderNutrition();
+  showToast('Supplement gespeichert!');
+}
+
+function deleteSupplement(id) {
+  save(SK.SUPPLEMENTS, getSupplements().filter(s => s.id !== id));
+  const log = getSupplLog();
+  Object.keys(log).forEach(ds => { delete log[ds][id]; });
+  save(SK.SUPPL_LOG, log);
+  renderNutrition();
+}
+
+function renderDaySupplements(dateStr) {
+  const suppl = getSupplements();
+  if (!suppl.length) return '';
+  const log = getSupplLog();
+  const taken = log[dateStr] || {};
+  const rows = suppl.map(s => {
+    const checked = !!taken[s.id];
+    return `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)">
+      <button onclick="toggleSupplLog('${dateStr}','${s.id}')"
+        style="width:24px;height:24px;border-radius:6px;border:2px solid ${checked?'var(--accent)':'var(--border)'};background:${checked?'var(--accent)':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer">
+        ${checked?'<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" width="13" height="13"><polyline points="20 6 9 17 4 12"/></svg>':''}
+      </button>
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:600;${checked?'text-decoration:line-through;opacity:.5':''}">${esc(s.name)}</div>
+        ${s.dose?`<div style="font-size:11px;color:var(--text3)">${esc(s.dose)}</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+  return `<div class="card mt-12">
+    <div class="card-title">Supplements</div>
+    ${rows}
+  </div>`;
+}
+
+function toggleSupplLog(dateStr, supplId) {
+  const log = getSupplLog();
+  if (!log[dateStr]) log[dateStr] = {};
+  log[dateStr][supplId] = !log[dateStr][supplId];
+  save(SK.SUPPL_LOG, log);
+  const panel = document.querySelector('.panel');
+  if (panel) openDayView(dateStr);
 }
 
 function submitFood(dateStr) {
@@ -706,6 +804,8 @@ const getSplits       = () => load(SK.SPLITS,         []);
 const getActiveSplit  = () => load(SK.ACTIVE_SPLIT,   null);
 const getAllExercises  = () => [...EXERCISE_DB, ...load(SK.CUSTOM_EX, [])];
 const getRepeatMeals  = () => load(SK.REPEAT_MEALS,   []);
+const getSupplements  = () => load(SK.SUPPLEMENTS,    []);
+const getSupplLog     = () => load(SK.SUPPL_LOG,      {});
 
 function renderWorkouts() {
   const el = document.getElementById('tab-workouts');
