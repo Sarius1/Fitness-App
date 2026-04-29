@@ -903,10 +903,7 @@ const getSupplLog     = () => load(SK.SUPPL_LOG,      {});
 const getSteps        = () => load(SK.STEPS,          {});
 const getReminders    = () => load(SK.REMINDERS,      []);
 const getSettings     = () => load(SK.SETTINGS,       {});
-const getMachineLabels = () => {
-  const s = getSettings();
-  return { l1: s.machineLabel1 || 'Sitz', l2: s.machineLabel2 || 'Brust' };
-};
+const exMachineLabels = ex => ({ l1: ex?.seatLabel || 'Sitz', l2: ex?.chestLabel || 'Brust' });
 
 function getAnalyticsDays() {
   const range = state.analyticsRange || '30d';
@@ -1002,23 +999,28 @@ function selectColor(el, c) {
 function renderPlanExList() {
   if (!state.pickerSelected.length) return '';
   const allEx = getAllExercises();
-  const ml = getMachineLabels();
   const items = state.pickerSelected.map(id => {
     const ex = allEx.find(e => e.id === id);
     if (!ex) return '';
     const ms = state.pickerMachineSettings[id] || {};
     const col = GROUP_COLORS[ex.group] || '#888';
     const isRun = ex.group === 'Runs';
+    const lbl1 = ms.seatLabel ?? 'Sitz';
+    const lbl2 = ms.chestLabel ?? 'Brust';
     const extraFields = isRun
       ? `<span style="font-size:10px;color:var(--text3)">Ziel km</span>
          <input type="text" inputmode="decimal" placeholder="–" id="ms_seat_${id}" value="${esc(ms.seatPos||'')}"
            style="width:52px;font-size:12px;padding:2px 5px;background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text1);text-align:center"
            onchange="(state.pickerMachineSettings['${id}']||(state.pickerMachineSettings['${id}']={})).seatPos=this.value.trim()||null">`
-      : `<span style="font-size:10px;color:var(--text3)">${esc(ml.l1)}</span>
+      : `<input type="text" placeholder="Sitz" id="ms_lbl1_${id}" value="${esc(lbl1)}"
+           style="width:46px;font-size:11px;padding:2px 5px;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text3);text-align:center"
+           onchange="(state.pickerMachineSettings['${id}']||(state.pickerMachineSettings['${id}']={})).seatLabel=this.value.trim()||'Sitz'">
          <input type="text" placeholder="–" id="ms_seat_${id}" value="${esc(ms.seatPos||'')}"
            style="width:42px;font-size:12px;padding:2px 5px;background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text1);text-align:center"
            onchange="(state.pickerMachineSettings['${id}']||(state.pickerMachineSettings['${id}']={})).seatPos=this.value.trim()||null">
-         <span style="font-size:10px;color:var(--text3)">${esc(ml.l2)}</span>
+         <input type="text" placeholder="Brust" id="ms_lbl2_${id}" value="${esc(lbl2)}"
+           style="width:46px;font-size:11px;padding:2px 5px;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text3);text-align:center"
+           onchange="(state.pickerMachineSettings['${id}']||(state.pickerMachineSettings['${id}']={})).chestLabel=this.value.trim()||'Brust'">
          <input type="text" placeholder="–" id="ms_chest_${id}" value="${esc(ms.chestSupport||'')}"
            style="width:42px;font-size:12px;padding:2px 5px;background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text1);text-align:center"
            onchange="(state.pickerMachineSettings['${id}']||(state.pickerMachineSettings['${id}']={})).chestSupport=this.value.trim()||null">`;
@@ -1050,8 +1052,10 @@ function openEditPlan(planId) {
   state.pickerPlanColor = plan.color || PLAN_COLORS[0];
   state.pickerMachineSettings = {};
   (plan.exercises||[]).forEach(e => {
-    if (e.seatPos != null || e.chestSupport != null)
-      state.pickerMachineSettings[e.id] = { seatPos: e.seatPos||null, chestSupport: e.chestSupport||null };
+    state.pickerMachineSettings[e.id] = {
+      seatPos: e.seatPos || null, chestSupport: e.chestSupport || null,
+      seatLabel: e.seatLabel || 'Sitz', chestLabel: e.chestLabel || 'Brust',
+    };
   });
   openOverlay(`
     <div class="input-group"><label class="input-label">Plan Name</label><input class="input" id="pn_name" type="text" value="${esc(plan.name)}"></div>
@@ -1072,9 +1076,11 @@ function savePlan(planId) {
     const ex = allEx.find(e => e.id === id);
     const prev = existing.find(e => e.id === id);
     const ms = state.pickerMachineSettings[id] || {};
-    const seatPos = document.getElementById('ms_seat_'+id)?.value.trim() || ms.seatPos || prev?.seatPos || null;
+    const seatPos      = document.getElementById('ms_seat_'+id)?.value.trim()  || ms.seatPos      || prev?.seatPos      || null;
     const chestSupport = document.getElementById('ms_chest_'+id)?.value.trim() || ms.chestSupport || prev?.chestSupport || null;
-    return ex ? { id:ex.id, name:ex.name, group:ex.group, sets:prev?.sets||3, reps:prev?.reps||'8-12', seatPos, chestSupport } : null;
+    const seatLabel    = document.getElementById('ms_lbl1_'+id)?.value.trim()  || ms.seatLabel    || prev?.seatLabel    || 'Sitz';
+    const chestLabel   = document.getElementById('ms_lbl2_'+id)?.value.trim()  || ms.chestLabel   || prev?.chestLabel   || 'Brust';
+    return ex ? { id:ex.id, name:ex.name, group:ex.group, sets:prev?.sets||3, reps:prev?.reps||'8-12', seatPos, chestSupport, seatLabel, chestLabel } : null;
   }).filter(Boolean);
 
   const plans = allPlans;
@@ -1099,11 +1105,14 @@ function deletePlan(planId) {
 function openExPicker(planId, mode) {
   state.pickerPlanName = document.getElementById('pn_name')?.value || state.pickerPlanName || '';
   state.pickerSelected.forEach(id => {
-    const s = document.getElementById('ms_seat_'+id)?.value.trim() || null;
-    const c = document.getElementById('ms_chest_'+id)?.value.trim() || null;
     if (!state.pickerMachineSettings[id]) state.pickerMachineSettings[id] = {};
-    state.pickerMachineSettings[id].seatPos = s;
-    state.pickerMachineSettings[id].chestSupport = c;
+    const ms = state.pickerMachineSettings[id];
+    ms.seatPos     = document.getElementById('ms_seat_'+id)?.value.trim() || null;
+    ms.chestSupport= document.getElementById('ms_chest_'+id)?.value.trim() || null;
+    const l1 = document.getElementById('ms_lbl1_'+id)?.value.trim();
+    const l2 = document.getElementById('ms_lbl2_'+id)?.value.trim();
+    if (l1) ms.seatLabel = l1;
+    if (l2) ms.chestLabel = l2;
   });
   state.exPickerGroup = 'All';
   state.exPickerSearch = '';
@@ -1281,7 +1290,7 @@ function renderWorkoutSession() {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="15" height="15"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>`).join('');
-    const ml = getMachineLabels();
+    const ml = exMachineLabels(ex);
     const machineInfo = (ex.seatPos != null || ex.chestSupport != null)
       ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">
           ${ex.seatPos != null ? `<span style="font-size:11px;color:var(--text2);background:var(--card2);padding:2px 8px;border-radius:8px">${esc(ml.l1)}: <b>${esc(ex.seatPos)}</b></span>` : ''}
@@ -1370,7 +1379,7 @@ function delSet(ei, si) {
 function openMachineSettings(ei) {
   const aw = state.activeWorkout; if (!aw) return;
   const ex = aw.exercises[ei];
-  const ml = getMachineLabels();
+  const ml = exMachineLabels(ex);
   openOverlay(`
     <div style="display:flex;flex-direction:column;gap:14px">
       <p style="margin:0;color:var(--text2);font-size:13px">Einstellungen für <b>${esc(ex.name)}</b></p>
@@ -2848,7 +2857,6 @@ function init() {
 function openSettings() {
   const s = getSettings();
   const reminders = getReminders();
-  const ml = getMachineLabels();
   const remHtml = reminders.length
     ? reminders.map(r => `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
         <div style="flex:1">
@@ -2882,15 +2890,6 @@ function openSettings() {
           <input class="input" id="set_stepgoal" type="number" inputmode="numeric" placeholder="z.B. 10000" value="${s.stepGoal||''}" style="flex:1">
           <button class="btn btn-primary btn-sm" onclick="saveSettingsField('stepGoal',parseInt(document.getElementById('set_stepgoal').value)||0);showToast('Gespeichert!')">OK</button>
         </div>
-      </div>
-      <div class="card" style="margin-bottom:12px">
-        <div class="card-title">Maschinenbezeichnungen</div>
-        <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">
-          <input class="input" id="set_ml1" type="text" placeholder="Sitz" value="${esc(ml.l1)}" style="flex:1">
-          <input class="input" id="set_ml2" type="text" placeholder="Brust" value="${esc(ml.l2)}" style="flex:1">
-          <button class="btn btn-primary btn-sm" onclick="saveSettingsField('machineLabel1',document.getElementById('set_ml1').value.trim()||'Sitz');saveSettingsField('machineLabel2',document.getElementById('set_ml2').value.trim()||'Brust');showToast('Gespeichert!')">OK</button>
-        </div>
-        <div style="font-size:11px;color:var(--text3)">Bezeichnungen für Maschineneinstellungen (z.B. Sitz / Brust, Griff / Höhe …)</div>
       </div>
       <div class="card" style="margin-bottom:12px">
         <div class="card-title">Erinnerungen</div>
