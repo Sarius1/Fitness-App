@@ -10,12 +10,13 @@ const SK = {
   SPLITS: 'ft_splits', ACTIVE_SPLIT: 'ft_active_split',
   REPEAT_MEALS: 'ft_rmeal',
   SUPPLEMENTS: 'ft_suppl', SUPPL_LOG: 'ft_suppl_log',
+  STEPS: 'ft_steps', REMINDERS: 'ft_reminders',
 };
 const DEFAULT_GOALS = { calories: 2500, protein: 150, carbs: 300, fat: 70 };
 const GROUP_COLORS = {
   'Chest':'#ff6b6b','Back':'#4ecdc4','Shoulders':'#45b7d1',
   'Biceps':'#a8e6cf','Triceps':'#ffd93d','Legs':'#c9b1ff',
-  'Core':'#ff9f43','Full Body':'#6c63ff','Custom':'#888',
+  'Core':'#ff9f43','Full Body':'#6c63ff','Custom':'#888','Runs':'#22c55e',
 };
 const PLAN_COLORS = ['#8b5cf6','#3b82f6','#22c55e','#f59e0b','#ef4444','#ec4899','#14b8a6','#f97316'];
 const EXERCISE_DB = [
@@ -88,6 +89,9 @@ const EXERCISE_DB = [
   {id:'e067',name:'Box Jump',group:'Full Body'},
   {id:'e068',name:"Farmer's Walk",group:'Full Body'},
   {id:'e069',name:'Thruster',group:'Full Body'},
+  {id:'r001',name:'Run',group:'Runs'},
+  {id:'r002',name:'Intervall Run',group:'Runs'},
+  {id:'r003',name:'Tempo Run',group:'Runs'},
 ];
 
 /* ═══════════════════════════════════════════════════════════
@@ -109,6 +113,9 @@ const state = {
   bodyModelRotation: 0,
   timerInterval: null,
   analyticsGymExercise: '',
+  analyticsRange: '30d',
+  historyFilter: '',
+  runTypeFilter: 'all',
   exPickerGroup: 'All',
   exPickerSearch: '',
 };
@@ -438,16 +445,23 @@ function openDayView(dateStr) {
 
   const foodsHtml = foods.length
     ? foods.map(f => `<div class="food-item">
-        <div class="food-info">
+        <div class="food-info" style="flex:1;min-width:0">
           <div class="food-name">${esc(f.name)}</div>
           <div class="food-macros">P ${f.protein}g · C ${f.carbs}g · F ${f.fat}g</div>
         </div>
         <span class="food-cal">${f.calories} kcal</span>
+        <button class="icon-btn" style="color:var(--text2);padding:4px" onclick="openEditFoodModal('${dateStr}','${f.id}')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
         <button class="icon-btn food-delete" onclick="deleteFood('${dateStr}','${f.id}')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
         </button>
       </div>`).join('')
     : '<div style="text-align:center;padding:20px 0;color:var(--text2);font-size:14px">No food logged yet</div>';
+
+  const stepsData = getSteps();
+  const todaySteps = stepsData[dateStr] || 0;
+  const stepGoal = getSettings().stepGoal || 0;
 
   openPanel(`
     <div class="panel-header">
@@ -456,7 +470,6 @@ function openDayView(dateStr) {
         Back
       </button>
       <span class="panel-title">${fmtShort(dateStr)}</span>
-      <button class="panel-action" onclick="openAddFoodModal('${dateStr}')">+ Add</button>
     </div>
     <div class="panel-body">
       ${splitBanner}
@@ -474,8 +487,19 @@ function openDayView(dateStr) {
       <div class="card">
         <div class="card-title">Food Log</div>
         ${foodsHtml}
+        <button class="btn btn-secondary btn-sm" style="margin-top:10px;width:100%" onclick="openAddFoodModal('${dateStr}')">+ Essen hinzufügen</button>
       </div>
-      <button class="btn btn-primary btn-full mt-12" onclick="openAddFoodModal('${dateStr}')">+ Add Food</button>
+      <div class="card mt-12">
+        <div class="card-title">Schritte</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input class="input" id="steps_input" type="number" inputmode="numeric" placeholder="z.B. 8500"
+            value="${todaySteps || ''}" style="flex:1;text-align:right;font-size:16px;font-weight:700;padding:9px 12px">
+          ${stepGoal ? `<span style="font-size:12px;color:var(--text3);white-space:nowrap">/ ${stepGoal}</span>` : ''}
+          <button class="btn btn-primary btn-sm" onclick="saveSteps('${dateStr}')">Speichern</button>
+        </div>
+        ${todaySteps && stepGoal ? `<div class="prog-bar-track" style="margin-top:8px"><div class="prog-bar-fill prog-bar-green" style="width:${Math.min((todaySteps/stepGoal)*100,100)}%"></div></div>` : ''}
+      </div>
+      <button class="btn btn-secondary btn-full mt-12" onclick="openAddRunFromDay('${dateStr}')">🏃 Run loggen</button>
       ${renderDaySupplements(dateStr)}
     </div>`);
 }
@@ -695,6 +719,66 @@ function deleteFood(dateStr, foodId) {
   openDayView(dateStr);
 }
 
+function openEditFoodModal(dateStr, foodId) {
+  const data = getNutritionData();
+  const f = (data[dateStr]?.foods || []).find(x => x.id === foodId);
+  if (!f) return;
+  openOverlay(`
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div class="input-group"><label class="input-label">Name</label><input class="input" id="ef_name" type="text" value="${esc(f.name)}"></div>
+      <div class="input-row">
+        <div class="input-group"><label class="input-label">Kalorien</label><input class="input" id="ef_cal" type="number" inputmode="decimal" value="${f.calories}"></div>
+        <div class="input-group"><label class="input-label">Protein (g)</label><input class="input" id="ef_pro" type="number" inputmode="decimal" value="${f.protein}"></div>
+      </div>
+      <div class="input-row">
+        <div class="input-group"><label class="input-label">Kohlenhydrate (g)</label><input class="input" id="ef_carb" type="number" inputmode="decimal" value="${f.carbs}"></div>
+        <div class="input-group"><label class="input-label">Fett (g)</label><input class="input" id="ef_fat" type="number" inputmode="decimal" value="${f.fat}"></div>
+      </div>
+      <button class="btn btn-primary btn-full" onclick="saveEditFood('${dateStr}','${foodId}')">Speichern</button>
+    </div>`, 'Gericht bearbeiten');
+}
+
+function saveEditFood(dateStr, foodId) {
+  const name = document.getElementById('ef_name')?.value.trim();
+  if (!name) { showToast('Name eingeben'); return; }
+  const data = getNutritionData();
+  const foods = data[dateStr]?.foods || [];
+  const idx = foods.findIndex(f => f.id === foodId);
+  if (idx < 0) return;
+  foods[idx] = {
+    ...foods[idx], name,
+    calories: parseFloat(document.getElementById('ef_cal')?.value) || 0,
+    protein:  parseFloat(document.getElementById('ef_pro')?.value) || 0,
+    carbs:    parseFloat(document.getElementById('ef_carb')?.value) || 0,
+    fat:      parseFloat(document.getElementById('ef_fat')?.value) || 0,
+  };
+  save(SK.NUTRITION, data);
+  closeOverlay();
+  openDayView(dateStr);
+}
+
+function saveSteps(dateStr) {
+  const val = parseInt(document.getElementById('steps_input')?.value) || 0;
+  const steps = getSteps();
+  steps[dateStr] = val;
+  save(SK.STEPS, steps);
+  showToast('Schritte gespeichert!');
+  openDayView(dateStr);
+}
+
+function openAddRunFromDay(dateStr) {
+  openOverlay(`${runFormHTML({ date: dateStr })}<button class="btn btn-primary btn-full mt-8" onclick="saveRunFromDay('${dateStr}')">Run speichern</button>`, 'Run loggen');
+}
+
+function saveRunFromDay(dateStr) {
+  const run = collectRunForm(); if (!run) return;
+  run.id = uid();
+  const runs = getRuns(); runs.unshift(run); save(SK.RUNS, runs);
+  closeOverlay();
+  showToast('Run gespeichert! 🏃');
+  openDayView(dateStr);
+}
+
 function saveBodyWeight(dateStr) {
   const val = parseFloat(document.getElementById('bw_input')?.value);
   if (!(val > 0)) { showToast('Enter a weight'); return; }
@@ -816,6 +900,31 @@ const getAllExercises  = () => [...EXERCISE_DB, ...load(SK.CUSTOM_EX, [])];
 const getRepeatMeals  = () => load(SK.REPEAT_MEALS,   []);
 const getSupplements  = () => load(SK.SUPPLEMENTS,    []);
 const getSupplLog     = () => load(SK.SUPPL_LOG,      {});
+const getSteps        = () => load(SK.STEPS,          {});
+const getReminders    = () => load(SK.REMINDERS,      []);
+const getSettings     = () => load(SK.SETTINGS,       {});
+const getMachineLabels = () => {
+  const s = getSettings();
+  return { l1: s.machineLabel1 || 'Sitz', l2: s.machineLabel2 || 'Brust' };
+};
+
+function getAnalyticsDays() {
+  const range = state.analyticsRange || '30d';
+  if (range === '7d') return getLast7Days();
+  if (range === '30d') return getLast30Days();
+  const allData = getNutritionData();
+  const histDates = getHistory().map(w => w.date);
+  const runDates = getRuns().map(r => r.date);
+  const allDates = [...Object.keys(allData), ...histDates, ...runDates].filter(Boolean).sort();
+  if (!allDates.length) return getLast30Days();
+  const start = parseDate(allDates[0]);
+  const now = new Date(); now.setHours(0,0,0,0);
+  const days = [];
+  for (let d = new Date(start); d <= now; d.setDate(d.getDate()+1)) {
+    days.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+  }
+  return days;
+}
 
 function renderWorkouts() {
   const el = document.getElementById('tab-workouts');
@@ -893,25 +1002,31 @@ function selectColor(el, c) {
 function renderPlanExList() {
   if (!state.pickerSelected.length) return '';
   const allEx = getAllExercises();
+  const ml = getMachineLabels();
   const items = state.pickerSelected.map(id => {
     const ex = allEx.find(e => e.id === id);
     if (!ex) return '';
     const ms = state.pickerMachineSettings[id] || {};
     const col = GROUP_COLORS[ex.group] || '#888';
+    const isRun = ex.group === 'Runs';
+    const extraFields = isRun
+      ? `<span style="font-size:10px;color:var(--text3)">Ziel km</span>
+         <input type="text" inputmode="decimal" placeholder="–" id="ms_seat_${id}" value="${esc(ms.seatPos||'')}"
+           style="width:52px;font-size:12px;padding:2px 5px;background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text1);text-align:center"
+           onchange="(state.pickerMachineSettings['${id}']||(state.pickerMachineSettings['${id}']={})).seatPos=this.value.trim()||null">`
+      : `<span style="font-size:10px;color:var(--text3)">${esc(ml.l1)}</span>
+         <input type="text" placeholder="–" id="ms_seat_${id}" value="${esc(ms.seatPos||'')}"
+           style="width:42px;font-size:12px;padding:2px 5px;background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text1);text-align:center"
+           onchange="(state.pickerMachineSettings['${id}']||(state.pickerMachineSettings['${id}']={})).seatPos=this.value.trim()||null">
+         <span style="font-size:10px;color:var(--text3)">${esc(ml.l2)}</span>
+         <input type="text" placeholder="–" id="ms_chest_${id}" value="${esc(ms.chestSupport||'')}"
+           style="width:42px;font-size:12px;padding:2px 5px;background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text1);text-align:center"
+           onchange="(state.pickerMachineSettings['${id}']||(state.pickerMachineSettings['${id}']={})).chestSupport=this.value.trim()||null">`;
     return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">
       <div style="width:26px;height:26px;border-radius:6px;background:${col};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff;flex-shrink:0">${ex.group.substring(0,2).toUpperCase()}</div>
       <div style="flex:1;min-width:0">
         <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(ex.name)}</div>
-        <div style="display:flex;gap:6px;margin-top:4px;align-items:center">
-          <span style="font-size:10px;color:var(--text3)">Sitz</span>
-          <input type="text" inputmode="numeric" placeholder="–" id="ms_seat_${id}" value="${esc(ms.seatPos||'')}"
-            style="width:42px;font-size:12px;padding:2px 5px;background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text1);text-align:center"
-            onchange="(state.pickerMachineSettings['${id}']||(state.pickerMachineSettings['${id}']={})).seatPos=this.value.trim()||null">
-          <span style="font-size:10px;color:var(--text3)">Brust</span>
-          <input type="text" inputmode="numeric" placeholder="–" id="ms_chest_${id}" value="${esc(ms.chestSupport||'')}"
-            style="width:42px;font-size:12px;padding:2px 5px;background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text1);text-align:center"
-            onchange="(state.pickerMachineSettings['${id}']||(state.pickerMachineSettings['${id}']={})).chestSupport=this.value.trim()||null">
-        </div>
+        <div style="display:flex;gap:6px;margin-top:4px;align-items:center;flex-wrap:wrap">${extraFields}</div>
       </div>
     </div>`;
   }).join('');
@@ -1166,22 +1281,29 @@ function renderWorkoutSession() {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="15" height="15"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>`).join('');
+    const ml = getMachineLabels();
     const machineInfo = (ex.seatPos != null || ex.chestSupport != null)
       ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">
-          ${ex.seatPos != null ? `<span style="font-size:11px;color:var(--text2);background:var(--card2);padding:2px 8px;border-radius:8px">Sitz: <b>${esc(ex.seatPos)}</b></span>` : ''}
-          ${ex.chestSupport != null ? `<span style="font-size:11px;color:var(--text2);background:var(--card2);padding:2px 8px;border-radius:8px">Brust: <b>${esc(ex.chestSupport)}</b></span>` : ''}
+          ${ex.seatPos != null ? `<span style="font-size:11px;color:var(--text2);background:var(--card2);padding:2px 8px;border-radius:8px">${esc(ml.l1)}: <b>${esc(ex.seatPos)}</b></span>` : ''}
+          ${ex.chestSupport != null ? `<span style="font-size:11px;color:var(--text2);background:var(--card2);padding:2px 8px;border-radius:8px">${esc(ml.l2)}: <b>${esc(ex.chestSupport)}</b></span>` : ''}
         </div>` : '';
+    const isRunEx = ex.group === 'Runs';
+    const cardBody = isRunEx
+      ? `<div style="padding:8px 0">
+          ${ex.seatPos ? `<div style="font-size:13px;color:var(--text2);margin-bottom:8px">Ziel: <b>${esc(ex.seatPos)} km</b></div>` : ''}
+          <button class="btn btn-primary btn-sm" onclick="closePanel();switchWorkoutSub('running');openAddRun()">🏃 Run jetzt loggen</button>
+        </div>`
+      : `${machineInfo}<div class="workout-sets">${setsHtml}<button class="add-set-btn" onclick="addSet(${ei})">+ Add Set</button></div>`;
     return `<div class="workout-ex-card">
       <div class="workout-ex-header">
         <div class="ex-badge" style="background:${col};width:32px;height:32px;border-radius:8px;font-size:10px">${abbr}</div>
         <span class="workout-ex-name">${esc(ex.name)}</span>
-        <span class="workout-ex-prev">${prev}</span>
-        <button class="icon-btn" style="color:var(--text3);padding:4px" title="Maschineneinstellung" onclick="openMachineSettings(${ei})">
+        <span class="workout-ex-prev">${isRunEx ? '' : prev}</span>
+        ${isRunEx ? '' : `<button class="icon-btn" style="color:var(--text3);padding:4px" title="Maschineneinstellung" onclick="openMachineSettings(${ei})">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>
-        </button>
+        </button>`}
       </div>
-      ${machineInfo}
-      <div class="workout-sets">${setsHtml}<button class="add-set-btn" onclick="addSet(${ei})">+ Add Set</button></div>
+      ${cardBody}
     </div>`;
   }).join('');
 
@@ -1248,17 +1370,18 @@ function delSet(ei, si) {
 function openMachineSettings(ei) {
   const aw = state.activeWorkout; if (!aw) return;
   const ex = aw.exercises[ei];
+  const ml = getMachineLabels();
   openOverlay(`
     <div style="display:flex;flex-direction:column;gap:14px">
       <p style="margin:0;color:var(--text2);font-size:13px">Einstellungen für <b>${esc(ex.name)}</b></p>
       <div style="display:flex;flex-direction:column;gap:6px">
-        <label style="font-size:12px;color:var(--text3)">Sitzposition</label>
-        <input id="ms_seat" class="form-input" type="text" inputmode="numeric" placeholder="z.B. 3"
+        <label style="font-size:12px;color:var(--text3)">${esc(ml.l1)}</label>
+        <input id="ms_seat" class="form-input" type="text" placeholder="z.B. 3"
           value="${esc(ex.seatPos ?? '')}">
       </div>
       <div style="display:flex;flex-direction:column;gap:6px">
-        <label style="font-size:12px;color:var(--text3)">Brustsupport</label>
-        <input id="ms_chest" class="form-input" type="text" inputmode="numeric" placeholder="z.B. 2"
+        <label style="font-size:12px;color:var(--text3)">${esc(ml.l2)}</label>
+        <input id="ms_chest" class="form-input" type="text" placeholder="z.B. 2"
           value="${esc(ex.chestSupport ?? '')}">
       </div>
       <button class="btn btn-primary btn-full" onclick="
@@ -1330,7 +1453,13 @@ function renderHistory() {
     el.innerHTML = `<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">No workouts yet</div><div class="empty-sub">Start a workout from Plans and it'll appear here.</div></div>`;
     return;
   }
-  el.innerHTML = hist.map(wo => {
+  const planNames = [...new Set(hist.map(w => w.planName).filter(Boolean))];
+  const filterSel = planNames.length > 1 ? `<select class="input" style="margin-bottom:10px" onchange="state.historyFilter=this.value;renderHistory()">
+    <option value="">Alle Pläne</option>
+    ${planNames.map(n=>`<option value="${esc(n)}"${n===state.historyFilter?' selected':''}>${esc(n)}</option>`).join('')}
+  </select>` : '';
+  const filtered = state.historyFilter ? hist.filter(w => w.planName === state.historyFilter) : hist;
+  el.innerHTML = filterSel + filtered.map(wo => {
     const dur = wo.duration ? `${Math.floor(wo.duration/60)}min` : '';
     const exNames = (wo.exercises||[]).map(e=>e.name).slice(0,3).join(', ');
     const more = (wo.exercises?.length||0) > 3 ? ` +${wo.exercises.length-3}` : '';
@@ -1465,24 +1594,37 @@ function onTimeBlur(el) {
 function renderRunningList() {
   const runs = getRuns();
   const el = document.getElementById('wo-sub');
-  const addBtn = `<button class="btn btn-primary btn-full" style="margin-bottom:12px" onclick="openAddRun()">+ Log Run</button>`;
+  const addBtn = `<button class="btn btn-primary btn-full" style="margin-bottom:10px" onclick="openAddRun()">+ Run loggen</button>`;
   if (!runs.length) {
     el.innerHTML = addBtn + `<div class="empty-state" style="padding-top:16px"><div class="empty-icon">🏃</div><div class="empty-title">No runs yet</div><div class="empty-sub">Log your first run to track your pace and distance over time.</div></div>`;
     return;
   }
-  el.innerHTML = addBtn + runs.map(r => {
-    const isInterval = r.type === 'interval';
-    const pace = isInterval ? '--' : calcPace(r.distance, r.time);
-    const icon = isInterval ? '⚡' : '🏃';
-    const badge = isInterval
-      ? `<span style="background:rgba(249,115,22,.15);color:#f97316;font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;margin-left:6px">INTERVAL</span>`
+  const typeFilter = state.runTypeFilter || 'all';
+  const filterBar = `<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+    ${['all','normal','interval','tempo'].map(t => {
+      const active = typeFilter === t;
+      const labels = { all:'Alle', normal:'Normal', interval:'Intervall', tempo:'Tempo' };
+      return `<button onclick="state.runTypeFilter='${t}';renderRunningList()" style="padding:4px 12px;font-size:12px;font-weight:600;border-radius:8px;border:none;cursor:pointer;background:${active?'var(--accent)':'var(--card2)'};color:${active?'#fff':'var(--text2)'}">${labels[t]}</button>`;
+    }).join('')}
+  </div>`;
+  const filtered = typeFilter === 'all' ? runs : runs.filter(r => (r.type||'normal') === typeFilter);
+  el.innerHTML = addBtn + filterBar + (filtered.length ? filtered.map(r => {
+    const rt = r.type || 'normal';
+    const isInterval = rt === 'interval';
+    const isTempo = rt === 'tempo';
+    const pace = (isInterval) ? '--' : calcPace(r.distance, r.time);
+    const icon = isInterval ? '⚡' : isTempo ? '💨' : '🏃';
+    const badgeStyle = isInterval ? 'background:rgba(249,115,22,.15);color:#f97316'
+      : isTempo ? 'background:rgba(239,68,68,.15);color:#ef4444' : '';
+    const badge = (isInterval || isTempo)
+      ? `<span style="${badgeStyle};font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;margin-left:6px">${isInterval?'INTERVALL':'TEMPO'}</span>`
       : '';
     const detail = isInterval
       ? `${r.intervals}× ${fmtDuration(r.workTime)} / ${fmtDuration(r.restTime)} rest`
-      : `${fmtDuration(r.time)}`;
+      : fmtDuration(r.time);
     const sub = r.notes ? ` · ${esc(r.notes)}` : '';
     return `<div class="run-card" onclick="openEditRun('${r.id}')">
-      <div class="run-icon" style="${isInterval?'background:rgba(249,115,22,.15)':''}">${icon}</div>
+      <div class="run-icon" style="${isInterval?'background:rgba(249,115,22,.15)':isTempo?'background:rgba(239,68,68,.15)':''}">${icon}</div>
       <div class="run-info">
         <div class="run-date">${fmtShort(r.date)}${badge}</div>
         <div class="run-main">${r.distance} km</div>
@@ -1494,21 +1636,25 @@ function renderRunningList() {
           : `<div class="run-pace">${pace}</div><div class="run-pace-label">min/km</div>`}
       </div>
     </div>`;
-  }).join('');
+  }).join('') : '<div style="text-align:center;padding:20px;color:var(--text2)">Keine Einträge für diesen Filter</div>');
 }
 
 // Run form builder (shared by add and edit)
 function runFormHTML(r = {}) {
-  const isInt = r.type === 'interval';
+  const rt = r.type || 'normal';
+  const isInt = rt === 'interval';
+  const isTempo = rt === 'tempo';
   return `
-    <div class="input-group"><label class="input-label">Date</label><input class="input" id="r_date" type="date" value="${r.date||todayStr()}"></div>
+    <div class="input-group"><label class="input-label">Datum</label><input class="input" id="r_date" type="date" value="${r.date||todayStr()}"></div>
     <div class="input-group">
-      <label class="input-label">Type</label>
-      <div style="display:flex;gap:8px">
+      <label class="input-label">Typ</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
         <button type="button" id="r_type_normal" onclick="setRunType('normal')"
-          class="btn btn-sm" style="flex:1;${!isInt?'background:var(--accent);color:#fff':'background:var(--card2);color:var(--text)'}">Normal Run</button>
+          class="btn btn-sm" style="flex:1;${!isInt&&!isTempo?'background:var(--accent);color:#fff':'background:var(--card2);color:var(--text)'}">Normal</button>
         <button type="button" id="r_type_interval" onclick="setRunType('interval')"
-          class="btn btn-sm" style="flex:1;${isInt?'background:#f97316;color:#fff':'background:var(--card2);color:var(--text)'}">Interval Run</button>
+          class="btn btn-sm" style="flex:1;${isInt?'background:#f97316;color:#fff':'background:var(--card2);color:var(--text)'}">Intervall</button>
+        <button type="button" id="r_type_tempo" onclick="setRunType('tempo')"
+          class="btn btn-sm" style="flex:1;${isTempo?'background:#ef4444;color:#fff':'background:var(--card2);color:var(--text)'}">Tempo</button>
       </div>
     </div>
     <div class="input-group"><label class="input-label">Distance (km)</label><input class="input" id="r_dist" type="number" inputmode="decimal" step="0.01" placeholder="5.0" value="${r.distance||''}"></div>
@@ -1539,19 +1685,26 @@ function runFormHTML(r = {}) {
 
 function setRunType(type) {
   const isInt = type === 'interval';
+  const isTempo = type === 'tempo';
   document.getElementById('r_normal_fields').style.display = isInt ? 'none' : 'block';
   document.getElementById('r_interval_fields').style.display = isInt ? 'block' : 'none';
-  document.getElementById('r_type_normal').style.cssText += isInt ? ';background:var(--card2);color:var(--text)' : ';background:var(--accent);color:#fff';
-  document.getElementById('r_type_interval').style.cssText += isInt ? ';background:#f97316;color:#fff' : ';background:var(--card2);color:var(--text)';
+  const btnN = document.getElementById('r_type_normal');
+  const btnI = document.getElementById('r_type_interval');
+  const btnT = document.getElementById('r_type_tempo');
+  if (btnN) { btnN.style.background = (!isInt&&!isTempo)?'var(--accent)':'var(--card2)'; btnN.style.color = (!isInt&&!isTempo)?'#fff':'var(--text)'; }
+  if (btnI) { btnI.style.background = isInt?'#f97316':'var(--card2)'; btnI.style.color = isInt?'#fff':'var(--text)'; }
+  if (btnT) { btnT.style.background = isTempo?'#ef4444':'var(--card2)'; btnT.style.color = isTempo?'#fff':'var(--text)'; }
 }
 
 function collectRunForm() {
   const isInterval = document.getElementById('r_interval_fields').style.display !== 'none';
+  const isTempo = document.getElementById('r_type_tempo')?.style.background?.includes('ef4444') ||
+    document.getElementById('r_type_tempo')?.style.background === 'rgb(239, 68, 68)';
   const dist = parseFloat(document.getElementById('r_dist')?.value);
   if (!dist) { showToast('Enter distance'); return null; }
   const run = {
     date: document.getElementById('r_date')?.value || todayStr(),
-    type: isInterval ? 'interval' : 'normal',
+    type: isInterval ? 'interval' : isTempo ? 'tempo' : 'normal',
     distance: dist,
     notes: document.getElementById('r_notes')?.value.trim() || '',
   };
@@ -2304,6 +2457,8 @@ function renderAnalytics() {
   const weekPros = last7.map(d=>getDayTotals(d).protein).filter(c=>c>0);
   const avgCal = weekCals.length ? Math.round(weekCals.reduce((a,b)=>a+b,0)/weekCals.length) : 0;
   const avgPro = weekPros.length ? Math.round(weekPros.reduce((a,b)=>a+b,0)/weekPros.length) : 0;
+  const range = state.analyticsRange || '30d';
+  const rangeBtn = (v, label) => `<button onclick="state.analyticsRange='${v}';renderAnalytics()" style="flex:1;padding:6px;font-size:12px;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:${range===v?'var(--accent)':'transparent'};color:${range===v?'#fff':'var(--text2)'}">${label}</button>`;
 
   const allExNames = [...new Set(hist.flatMap(w=>(w.exercises||[]).map(e=>e.name)))];
   if (!state.analyticsGymExercise && allExNames.length) state.analyticsGymExercise = allExNames[0];
@@ -2358,21 +2513,31 @@ function renderAnalytics() {
       </div>
     </div>
 
-    <div class="section-hd mt-8"><span class="section-title">Nutrition</span></div>
+    <div style="display:flex;gap:0;margin:10px 0;background:var(--card);border-radius:12px;padding:3px">
+      ${rangeBtn('7d','7 Tage')}${rangeBtn('30d','30 Tage')}${rangeBtn('all','Gesamt')}
+    </div>
+
+    <div class="section-hd mt-8"><span class="section-title">Ernährung</span></div>
     <div class="chart-card">
-      <div class="chart-title">Calories — Last 30 Days</div>
+      <div class="chart-title">Kalorien</div>
       <div class="chart-wrap"><canvas id="c_cal" height="160"></canvas></div>
     </div>
     <div class="chart-card">
-      <div class="chart-title">Protein — Last 30 Days</div>
+      <div class="chart-title">Protein</div>
       <div class="chart-wrap"><canvas id="c_pro" height="160"></canvas></div>
     </div>
 
-    <div class="section-hd mt-8"><span class="section-title">Body Weight</span></div>
+    <div class="section-hd mt-8"><span class="section-title">Körpergewicht</span></div>
     <div class="chart-card">
-      <div class="chart-title">Weight — Last 30 Days (kg)</div>
+      <div class="chart-title">Gewicht (kg)</div>
       <div class="chart-wrap"><canvas id="c_weight" height="160"></canvas></div>
     </div>
+
+    ${getSettings().stepGoal ? `<div class="section-hd mt-8"><span class="section-title">Schritte</span></div>
+    <div class="chart-card">
+      <div class="chart-title">Schritte pro Tag</div>
+      <div class="chart-wrap"><canvas id="c_steps" height="160"></canvas></div>
+    </div>` : ''}
 
     <div class="section-hd mt-8"><span class="section-title">Gym Progress</span></div>
     <div class="chart-card">
@@ -2387,7 +2552,7 @@ function renderAnalytics() {
       <div class="chart-wrap"><canvas id="c_gym_1rm" height="140"></canvas></div>
     </div>
 
-    <div class="section-hd mt-8"><span class="section-title">Running</span></div>
+    <div class="section-hd mt-8"><span class="section-title">Laufen</span></div>
     <div class="chart-card">
       <div class="chart-title">Pace — Normal Runs (min/km)</div>
       <div class="chart-wrap"><canvas id="c_run_pace" height="150"></canvas></div>
@@ -2401,11 +2566,11 @@ function renderAnalytics() {
       <div class="chart-wrap"><canvas id="c_run_intervals" height="140"></canvas></div>
     </div>` : ''}` ;
 
-  requestAnimationFrame(() => { drawNutCharts(); drawWeightChart(); drawGymCharts(); drawRunCharts(); initAnalyticsMuscleViewer(); });
+  requestAnimationFrame(() => { drawNutCharts(); drawWeightChart(); drawGymCharts(); drawRunCharts(); drawStepsChart(); initAnalyticsMuscleViewer(); });
 }
 
 function drawNutCharts() {
-  const days = getLast30Days();
+  const days = getAnalyticsDays();
   const labels = days.map(d => { const dt=parseDate(d); return `${dt.getMonth()+1}/${dt.getDate()}`; });
   const goals = getGoals();
   const cal = document.getElementById('c_cal'); if (cal) drawBar(cal, labels, days.map(d=>getDayTotals(d).calories), { color:'#8b5cf6', goalLine:goals.calories });
@@ -2413,7 +2578,7 @@ function drawNutCharts() {
 }
 
 function drawWeightChart() {
-  const days = getLast30Days();
+  const days = getAnalyticsDays();
   const data = getNutritionData();
   const labels = days.map(d => { const dt=parseDate(d); return `${dt.getMonth()+1}/${dt.getDate()}`; });
   const weights = days.map(d => {
@@ -2451,8 +2616,8 @@ function drawGymCharts() {
 
 function drawRunCharts() {
   const allRuns = getRuns().sort((a,b)=>a.date.localeCompare(b.date));
-  // Pace chart: normal runs only (pace meaningless for intervals)
-  const normalRuns = allRuns.filter(r => r.type !== 'interval').slice(-20);
+  // Pace chart: normal runs only (pace meaningless for intervals/tempo)
+  const normalRuns = allRuns.filter(r => !r.type || r.type === 'normal').slice(-20);
   const paceLabels = normalRuns.map(r=>fmtShort(r.date));
   const paces = normalRuns.map(r => r.distance&&r.time ? parseFloat((r.time/60/r.distance).toFixed(2)) : 0);
   const pc = document.getElementById('c_run_pace');
@@ -2471,6 +2636,16 @@ function drawRunCharts() {
     const iCounts = intervalRuns.map(r=>r.intervals||0);
     drawBar(ic, iLabels, iCounts, { color:'#f97316' });
   }
+}
+
+function drawStepsChart() {
+  const sc = document.getElementById('c_steps'); if (!sc) return;
+  const days = getAnalyticsDays();
+  const stepsData = getSteps();
+  const stepGoal = getSettings().stepGoal || 0;
+  const labels = days.map(d => { const dt=parseDate(d); return `${dt.getMonth()+1}/${dt.getDate()}`; });
+  const values = days.map(d => stepsData[d] || 0);
+  drawBar(sc, labels, values, { color:'#14b8a6', goalLine: stepGoal || null });
 }
 
 function getWeeklyRunDist(n) {
@@ -2652,18 +2827,144 @@ function init() {
   document.querySelectorAll('.nav-btn').forEach(btn =>
     btn.addEventListener('click', () => switchTab(btn.dataset.tab))
   );
-  document.getElementById('btnTheme')?.addEventListener('click', toggleTheme);
+  document.getElementById('btnSettings')?.addEventListener('click', openSettings);
   document.getElementById('btnExport')?.addEventListener('click', () =>
     openOverlay(`
       <div style="display:flex;flex-direction:column;gap:10px">
         <button class="btn btn-secondary btn-full" onclick="exportData();closeOverlay()">⬇ Export JSON Backup</button>
         <button class="btn btn-secondary btn-full" onclick="importData();closeOverlay()">⬆ Import JSON Backup</button>
-      </div>`, 'Data Backup')
+      </div>`, 'Daten-Backup')
   );
   document.getElementById('overlay')?.addEventListener('click', e => { if(e.target.id==='overlay') closeOverlay(); });
 
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  initReminders();
   renderNutrition();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SETTINGS
+═══════════════════════════════════════════════════════════ */
+function openSettings() {
+  const s = getSettings();
+  const reminders = getReminders();
+  const ml = getMachineLabels();
+  const remHtml = reminders.length
+    ? reminders.map(r => `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:600">${esc(r.text)}</div>
+          <div style="font-size:11px;color:var(--text3)">${r.time}</div>
+        </div>
+        <button class="icon-btn" style="color:var(--danger)" onclick="deleteReminder('${r.id}')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
+        </button>
+      </div>`).join('')
+    : `<div style="color:var(--text3);font-size:13px;padding:10px 0;text-align:center">Keine Erinnerungen</div>`;
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  openPanel(`
+    <div class="panel-header">
+      <button class="panel-back" onclick="closePanel()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="20" height="20"><polyline points="15 18 9 12 15 6"/></svg> Zurück
+      </button>
+      <span class="panel-title">Einstellungen</span>
+    </div>
+    <div class="panel-body">
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-title">Design</div>
+        <div style="display:flex;gap:8px">
+          <button onclick="setTheme('dark')" style="flex:1;padding:10px;border-radius:10px;border:2px solid ${isDark?'var(--accent)':'var(--border)'};background:${isDark?'var(--accent)18':'transparent'};cursor:pointer;font-size:13px;font-weight:600;color:var(--text1)">🌙 Dunkel</button>
+          <button onclick="setTheme('light')" style="flex:1;padding:10px;border-radius:10px;border:2px solid ${!isDark?'var(--accent)':'var(--border)'};background:${!isDark?'var(--accent)18':'transparent'};cursor:pointer;font-size:13px;font-weight:600;color:var(--text1)">☀️ Hell</button>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-title">Schrittziel</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input class="input" id="set_stepgoal" type="number" inputmode="numeric" placeholder="z.B. 10000" value="${s.stepGoal||''}" style="flex:1">
+          <button class="btn btn-primary btn-sm" onclick="saveSettingsField('stepGoal',parseInt(document.getElementById('set_stepgoal').value)||0);showToast('Gespeichert!')">OK</button>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-title">Maschinenbezeichnungen</div>
+        <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">
+          <input class="input" id="set_ml1" type="text" placeholder="Sitz" value="${esc(ml.l1)}" style="flex:1">
+          <input class="input" id="set_ml2" type="text" placeholder="Brust" value="${esc(ml.l2)}" style="flex:1">
+          <button class="btn btn-primary btn-sm" onclick="saveSettingsField('machineLabel1',document.getElementById('set_ml1').value.trim()||'Sitz');saveSettingsField('machineLabel2',document.getElementById('set_ml2').value.trim()||'Brust');showToast('Gespeichert!')">OK</button>
+        </div>
+        <div style="font-size:11px;color:var(--text3)">Bezeichnungen für Maschineneinstellungen (z.B. Sitz / Brust, Griff / Höhe …)</div>
+      </div>
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-title">Erinnerungen</div>
+        ${remHtml}
+        <button class="btn btn-primary btn-sm" style="margin-top:10px;width:100%" onclick="openAddReminderModal()">+ Erinnerung hinzufügen</button>
+      </div>
+    </div>`);
+}
+
+function setTheme(theme) {
+  const s = load(SK.SETTINGS, {}); s.theme = theme;
+  save(SK.SETTINGS, s); loadTheme(); openSettings();
+}
+
+function saveSettingsField(key, value) {
+  const s = load(SK.SETTINGS, {}); s[key] = value; save(SK.SETTINGS, s);
+}
+
+function openAddReminderModal() {
+  openOverlay(`
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="input-group">
+        <label class="input-label">Text</label>
+        <input class="input" id="rem_text" type="text" placeholder="z.B. Kreatin nehmen">
+      </div>
+      <div class="input-group">
+        <label class="input-label">Uhrzeit</label>
+        <input class="input" id="rem_time" type="time" value="17:00">
+      </div>
+      <button class="btn btn-primary btn-full" onclick="saveReminder()">Speichern</button>
+    </div>`, 'Erinnerung hinzufügen');
+}
+
+function saveReminder() {
+  const text = document.getElementById('rem_text')?.value.trim();
+  const time = document.getElementById('rem_time')?.value;
+  if (!text || !time) { showToast('Text und Uhrzeit eingeben'); return; }
+  const rems = getReminders();
+  rems.push({ id: uid(), text, time, enabled: true });
+  save(SK.REMINDERS, rems);
+  if (Notification.permission === 'default') {
+    Notification.requestPermission().catch(()=>{});
+  }
+  closeOverlay();
+  openSettings();
+  showToast('Erinnerung gespeichert!');
+}
+
+function deleteReminder(id) {
+  save(SK.REMINDERS, getReminders().filter(r => r.id !== id));
+  openSettings();
+}
+
+function initReminders() {
+  checkReminders();
+  setInterval(checkReminders, 60000);
+}
+
+function checkReminders() {
+  const reminders = getReminders().filter(r => r.enabled !== false);
+  if (!reminders.length) return;
+  const now = new Date();
+  const current = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  if (state._lastReminderMinute === current) return;
+  state._lastReminderMinute = current;
+  reminders.forEach(r => {
+    if (r.time === current) {
+      if (Notification?.permission === 'granted') {
+        try { new Notification('FitTrack', { body: r.text, icon: './icon.svg' }); } catch {}
+      } else {
+        showToast('🔔 ' + r.text);
+      }
+    }
+  });
 }
 
 document.addEventListener('DOMContentLoaded', init);
