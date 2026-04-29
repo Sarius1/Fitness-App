@@ -183,6 +183,14 @@ function toggleTheme() {
 /* ═══════════════════════════════════════════════════════════
    I18N
 ═══════════════════════════════════════════════════════════ */
+// Keys identical in both languages — no need to duplicate
+const TR_SHARED = {
+  tab_workouts:'Workouts', tab_analytics:'Analytics', supplements:'Supplements',
+  protein:'Protein', start:'▶ Start', normal:'Normal', tempo:'Tempo',
+  work_time:'Work Time (hh:mm:ss)', rest_time:'Rest Time (hh:mm:ss)',
+  gym_progress:'Gym Progress', pace_chart:'Pace — Normal Runs (min/km)',
+  reminder_text:'Text', language:'Sprache / Language',
+};
 const TR = {
   de: {
     tab_nutrition:'Ernährung', tab_workouts:'Workouts', tab_analytics:'Analytics',
@@ -292,7 +300,7 @@ const TR = {
   },
 };
 const lang = () => (load(SK.SETTINGS, {}).language || 'de');
-const t = k => TR[lang()]?.[k] ?? TR.de[k] ?? k;
+const t = k => TR[lang()]?.[k] ?? TR_SHARED[k] ?? TR.de[k] ?? k;
 
 /* ═══════════════════════════════════════════════════════════
    NAVIGATION
@@ -572,7 +580,7 @@ function openDayView(dateStr) {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
         </button>
       </div>`).join('')
-    : '<div style="text-align:center;padding:20px 0;color:var(--text2);font-size:14px">${t('no_food')}</div>';
+    : `<div style="text-align:center;padding:20px 0;color:var(--text2);font-size:14px">${t("no_food")}</div>`;
 
   const stepsData = getSteps();
   const todaySteps = stepsData[dateStr] || 0;
@@ -732,7 +740,7 @@ function submitRepeatMeal() {
   save(SK.REPEAT_MEALS, meals);
   closeOverlay();
   renderNutrition();
-  showToast('${t('meal_saved')}');
+  showToast(t('meal_saved'));
 }
 
 function deleteRepeatMeal(id) {
@@ -765,7 +773,7 @@ function saveNewSupplement() {
   save(SK.SUPPLEMENTS, suppl);
   closeOverlay();
   renderNutrition();
-  showToast('${t('supplement_saved')}');
+  showToast(t('supplement_saved'));
 }
 
 function deleteSupplement(id) {
@@ -784,7 +792,7 @@ function renderDaySupplements(dateStr) {
   const rows = suppl.map(s => {
     const checked = !!taken[s.id];
     return `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)">
-      <button onclick="toggleSupplLog('${dateStr}','${s.id}')"
+      <button data-suppl="${s.id}" onclick="toggleSupplLog('${dateStr}','${s.id}')"
         style="width:24px;height:24px;border-radius:6px;border:2px solid ${checked?'var(--accent)':'var(--border)'};background:${checked?'var(--accent)':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer">
         ${checked?'<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" width="13" height="13"><polyline points="20 6 9 17 4 12"/></svg>':''}
       </button>
@@ -803,10 +811,17 @@ function renderDaySupplements(dateStr) {
 function toggleSupplLog(dateStr, supplId) {
   const log = getSupplLog();
   if (!log[dateStr]) log[dateStr] = {};
-  log[dateStr][supplId] = !log[dateStr][supplId];
+  const nowChecked = !log[dateStr][supplId];
+  log[dateStr][supplId] = nowChecked;
   save(SK.SUPPL_LOG, log);
-  const panel = document.querySelector('.panel');
-  if (panel) openDayView(dateStr);
+  const btn = document.querySelector(`[data-suppl="${supplId}"]`);
+  if (btn) {
+    btn.style.borderColor = nowChecked ? 'var(--accent)' : 'var(--border)';
+    btn.style.background  = nowChecked ? 'var(--accent)' : 'transparent';
+    btn.innerHTML = nowChecked ? '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" width="13" height="13"><polyline points="20 6 9 17 4 12"/></svg>' : '';
+    const label = btn.nextElementSibling?.querySelector('div');
+    if (label) label.style.cssText = nowChecked ? 'font-size:14px;font-weight:600;text-decoration:line-through;opacity:.5' : 'font-size:14px;font-weight:600;';
+  }
 }
 
 function submitFood(dateStr) {
@@ -825,7 +840,7 @@ function submitFood(dateStr) {
   save(SK.NUTRITION, data);
   closeOverlay();
   openDayView(dateStr);
-  showToast('${t('food_saved')}');
+  showToast(t('food_saved'));
 }
 
 function deleteFood(dateStr, foodId) {
@@ -877,7 +892,7 @@ function saveSteps(dateStr) {
   const steps = getSteps();
   steps[dateStr] = val;
   save(SK.STEPS, steps);
-  showToast('${t('steps_saved')}');
+  showToast(t('steps_saved'));
   openDayView(dateStr);
 }
 
@@ -890,7 +905,7 @@ function saveRunFromDay(dateStr) {
   run.id = uid();
   const runs = getRuns(); runs.unshift(run); save(SK.RUNS, runs);
   closeOverlay();
-  showToast('${t('run_saved')}');
+  showToast(t('run_saved'));
   openDayView(dateStr);
 }
 
@@ -957,7 +972,7 @@ function setDayActivity(dateStr, type, planId, label) {
   save(SK.NUTRITION, data);
   closeOverlay();
   openDayView(dateStr);
-  showToast('${t('activity_set')}');
+  showToast(t('activity_set'));
 }
 
 function openCustomDayActivity(dateStr) {
@@ -976,7 +991,7 @@ function clearDayActivity(dateStr) {
   if (data[dateStr]) { delete data[dateStr].activityOverride; save(SK.NUTRITION, data); }
   closeOverlay();
   openDayView(dateStr);
-  showToast('${t('reset_done')}');
+  showToast(t('reset_done'));
 }
 
 function openGoalsModal() {
@@ -1000,7 +1015,7 @@ function saveGoals() {
     carbs:    parseFloat(document.getElementById('g_carb')?.value) || 300,
     fat:      parseFloat(document.getElementById('g_fat')?.value) || 70,
   });
-  closeOverlay(); renderNutrition(); showToast('${t('goals_saved')}');
+  closeOverlay(); renderNutrition(); showToast(t('goals_saved'));
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -1767,6 +1782,7 @@ function renderRunningList() {
 // Run form builder (shared by add and edit)
 function runFormHTML(r = {}) {
   const rt = r.type || 'normal';
+  state.currentRunType = rt;
   const isInt = rt === 'interval';
   const isTempo = rt === 'tempo';
   return `
@@ -1809,6 +1825,7 @@ function runFormHTML(r = {}) {
 }
 
 function setRunType(type) {
+  state.currentRunType = type;
   const isInt = type === 'interval';
   const isTempo = type === 'tempo';
   document.getElementById('r_normal_fields').style.display = isInt ? 'none' : 'block';
@@ -1822,14 +1839,13 @@ function setRunType(type) {
 }
 
 function collectRunForm() {
-  const isInterval = document.getElementById('r_interval_fields').style.display !== 'none';
-  const isTempo = document.getElementById('r_type_tempo')?.style.background?.includes('ef4444') ||
-    document.getElementById('r_type_tempo')?.style.background === 'rgb(239, 68, 68)';
+  const type = state.currentRunType || 'normal';
+  const isInterval = type === 'interval';
   const dist = parseFloat(document.getElementById('r_dist')?.value);
   if (!dist) { showToast('Enter distance'); return null; }
   const run = {
     date: document.getElementById('r_date')?.value || todayStr(),
-    type: isInterval ? 'interval' : isTempo ? 'tempo' : 'normal',
+    type,
     distance: dist,
     notes: document.getElementById('r_notes')?.value.trim() || '',
   };
@@ -2691,19 +2707,18 @@ function renderAnalytics() {
       <div class="chart-wrap"><canvas id="c_run_intervals" height="140"></canvas></div>
     </div>` : ''}` ;
 
-  requestAnimationFrame(() => { drawNutCharts(); drawWeightChart(); drawGymCharts(); drawRunCharts(); drawStepsChart(); initAnalyticsMuscleViewer(); });
+  const analyticsDays = getAnalyticsDays();
+  requestAnimationFrame(() => { drawNutCharts(analyticsDays); drawWeightChart(analyticsDays); drawGymCharts(hist); drawRunCharts(runs); drawStepsChart(analyticsDays); initAnalyticsMuscleViewer(); });
 }
 
-function drawNutCharts() {
-  const days = getAnalyticsDays();
+function drawNutCharts(days) {
   const labels = days.map(d => { const dt=parseDate(d); return `${dt.getMonth()+1}/${dt.getDate()}`; });
   const goals = getGoals();
   const cal = document.getElementById('c_cal'); if (cal) drawBar(cal, labels, days.map(d=>getDayTotals(d).calories), { color:'#8b5cf6', goalLine:goals.calories });
   const pro = document.getElementById('c_pro'); if (pro) drawBar(pro, labels, days.map(d=>getDayTotals(d).protein),  { color:'#3b82f6', goalLine:goals.protein });
 }
 
-function drawWeightChart() {
-  const days = getAnalyticsDays();
+function drawWeightChart(days) {
   const data = getNutritionData();
   const labels = days.map(d => { const dt=parseDate(d); return `${dt.getMonth()+1}/${dt.getDate()}`; });
   const weights = days.map(d => {
@@ -2719,10 +2734,10 @@ function drawWeightChart() {
   if (wc) drawLine(wc, labels, [{ values: weights, color: '#8b5cf6' }]);
 }
 
-function drawGymCharts() {
+function drawGymCharts(hist) {
   const exName = state.analyticsGymExercise || document.getElementById('gymExSel')?.value;
   if (!exName) return;
-  const sessions = getHistory()
+  const sessions = (hist || getHistory())
     .filter(w=>(w.exercises||[]).some(e=>e.name===exName))
     .sort((a,b)=>a.date.localeCompare(b.date)).slice(-20);
   const labels = sessions.map(w=>fmtShort(w.date));
@@ -2739,8 +2754,8 @@ function drawGymCharts() {
   const rc = document.getElementById('c_gym_1rm'); if (rc)  drawLine(rc,  labels, [{values:orm,   color:'#ef4444'}]);
 }
 
-function drawRunCharts() {
-  const allRuns = getRuns().sort((a,b)=>a.date.localeCompare(b.date));
+function drawRunCharts(runsArg) {
+  const allRuns = (runsArg || getRuns()).slice().sort((a,b)=>a.date.localeCompare(b.date));
   // Pace chart: normal runs only (pace meaningless for intervals/tempo)
   const normalRuns = allRuns.filter(r => !r.type || r.type === 'normal').slice(-20);
   const paceLabels = normalRuns.map(r=>fmtShort(r.date));
@@ -2763,9 +2778,8 @@ function drawRunCharts() {
   }
 }
 
-function drawStepsChart() {
+function drawStepsChart(days) {
   const sc = document.getElementById('c_steps'); if (!sc) return;
-  const days = getAnalyticsDays();
   const stepsData = getSteps();
   const stepGoal = getSettings().stepGoal || 0;
   const labels = days.map(d => { const dt=parseDate(d); return `${dt.getMonth()+1}/${dt.getDate()}`; });
@@ -3071,8 +3085,9 @@ function deleteReminder(id) {
 }
 
 function initReminders() {
+  if (state._reminderInterval) clearInterval(state._reminderInterval);
   checkReminders();
-  setInterval(checkReminders, 60000);
+  state._reminderInterval = setInterval(checkReminders, 60000);
 }
 
 function checkReminders() {
