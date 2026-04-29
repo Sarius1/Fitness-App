@@ -181,9 +181,123 @@ function toggleTheme() {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   I18N
+═══════════════════════════════════════════════════════════ */
+const TR = {
+  de: {
+    tab_nutrition:'Ernährung', tab_workouts:'Workouts', tab_analytics:'Analytics',
+    calendar:'Kalender', meals:'Mahlzeiten', supplements:'Supplements',
+    back:'Zurück', save:'Speichern', cancel:'Abbrechen', delete:'Löschen', edit:'Bearbeiten',
+    name:'Name', date:'Datum', notes_opt:'Notizen (optional)', search:'Suchen…',
+    log_today:'+ Heute loggen', goals:'Ziele', on_track:'Grün = auf Kurs',
+    body_weight:'Körpergewicht', food_log:'Essensprotokoll', no_food:'Noch nichts eingetragen',
+    add_food:'+ Essen hinzufügen', steps:'Schritte', log_run:'🏃 Run loggen',
+    add_supplement:'+ Supplement hinzufügen', no_supplements:'Keine Supplements eingetragen',
+    dosage:'Dosierung (optional)', supplement_saved:'Supplement gespeichert!',
+    saved_meals:'Gespeicherte Mahlzeiten', no_saved_meals:'Keine gespeicherten Mahlzeiten',
+    save_meal:'+ Neue Mahlzeit speichern', meal_saved:'Mahlzeit gespeichert!',
+    new_meal:'Neue Mahlzeit', saved:'Gespeicherte',
+    calories:'Kalorien', protein:'Protein', carbs:'Kohlenhydrate', fat:'Fett',
+    add:'Hinzufügen', meal_title:'Mahlzeit speichern', food_name:'Lebensmittel',
+    save_goals:'Ziele speichern', goals_saved:'Ziele gespeichert!', daily_goals:'⚙ Tagesziele',
+    add_activity:'+ Aktivität für diesen Tag', change:'Ändern', reset_split:'↩ Zurück zum Split',
+    custom_today:'Angepasst für heute', planned:'Geplant',
+    no_plans:'Noch keine Pläne', create_plan:'+ Plan erstellen', new_plan:'+ Neuer Plan',
+    resume:'Fortsetzen', start:'▶ Start', plan_name:'Planname', color:'Farbe',
+    choose_ex:'+ Übungen wählen', edit_ex:'Übungen bearbeiten', create:'Plan erstellen',
+    save_changes:'Änderungen speichern', new_plan_title:'Neuer Plan', edit_plan_title:'Plan bearbeiten',
+    selected:'ausgewählt', no_ex_found:'Keine Übungen gefunden',
+    add_custom_ex:'+ Eigene Übung hinzufügen', save_plan:'Plan speichern', target_km:'Ziel km',
+    cancel_workout:'✕ Abbrechen', finish_workout:'✓ Abschließen',
+    last_sets:'Zuletzt:', no_history:'Kein Verlauf', add_set:'+ Satz hinzufügen',
+    min_set:'Mindestens 1 Satz benötigt', machine_settings:'Maschineneinstellung',
+    settings_for:'Einstellungen für', locker_prompt:'Schließfach / Spindel (optional)',
+    start_workout:'▶ Training starten',
+    no_workouts:'Noch keine Workouts', sets_total:'Sätze gesamt', tap_edit:'Tippen zum Bearbeiten',
+    duration:'Dauer', all_plans:'Alle Pläne',
+    run_log_title:'Run loggen', run_saved:'Run gespeichert! 🏃',
+    no_runs:'Noch keine Läufe', type:'Typ', all:'Alle', normal:'Normal', interval:'Intervall', tempo:'Tempo',
+    distance_km:'Distanz (km)', total_time:'Gesamtzeit (hh:mm:ss)',
+    intervals_n:'Anzahl Intervalle', work_time:'Work Time (hh:mm:ss)', rest_time:'Rest Time (hh:mm:ss)',
+    save_run:'Lauf speichern', run_loggen:'+ Run loggen',
+    this_week:'Diese Woche', avg_calories:'Ø Kalorien', avg_protein:'Ø Protein',
+    days_7:'7 Tage', days_30:'30 Tage', total:'Gesamt',
+    nutrition_section:'Ernährung', body_weight_section:'Körpergewicht', weight_kg:'Gewicht (kg)',
+    steps_per_day:'Schritte pro Tag', gym_progress:'Gym Progress', running_section:'Laufen',
+    pace_chart:'Pace — Normal Runs (min/km)', weekly_dist:'Wöchentliche Distanz (km)',
+    no_hist:'Noch kein Verlauf', avg_weight:'Ø Gewicht pro Session (kg)',
+    settings:'Einstellungen', theme:'Design', dark:'🌙 Dunkel', light:'☀️ Hell',
+    step_goal:'Schrittziel', reminders:'Erinnerungen', no_reminders:'Keine Erinnerungen',
+    add_reminder:'+ Erinnerung hinzufügen', reminder_title:'Erinnerung hinzufügen',
+    reminder_text:'Text', reminder_time:'Uhrzeit', reminder_saved:'Erinnerung gespeichert!',
+    language:'Sprache', weight_logged:'kg gespeichert!', steps_saved:'Schritte gespeichert!',
+    food_saved:'Essen gespeichert!', enter_name:'Name eingeben',
+    edit_food_title:'Gericht bearbeiten', activity_set:'Aktivität gesetzt!', reset_done:'Zurückgesetzt',
+    splits_tab:'Splits', plans_tab:'Pläne', history_tab:'Verlauf', running_tab:'Laufen',
+    custom_ex_title:'Eigene Übung', ex_name:'Übungsname', muscle_group:'Muskelgruppe',
+    interval_chart:'⚡ Intervall-Sessions — Wiederholungen',
+  },
+  en: {
+    tab_nutrition:'Nutrition', tab_workouts:'Workouts', tab_analytics:'Analytics',
+    calendar:'Calendar', meals:'Saved Meals', supplements:'Supplements',
+    back:'Back', save:'Save', cancel:'Cancel', delete:'Delete', edit:'Edit',
+    name:'Name', date:'Date', notes_opt:'Notes (optional)', search:'Search…',
+    log_today:'+ Log Today', goals:'Goals', on_track:'Green = on track',
+    body_weight:'Body Weight', food_log:'Food Log', no_food:'No food logged yet',
+    add_food:'+ Add Food', steps:'Steps', log_run:'🏃 Log Run',
+    add_supplement:'+ Add Supplement', no_supplements:'No supplements added',
+    dosage:'Dosage (optional)', supplement_saved:'Supplement saved!',
+    saved_meals:'Saved Meals', no_saved_meals:'No saved meals',
+    save_meal:'+ Save New Meal', meal_saved:'Meal saved!',
+    new_meal:'New Meal', saved:'Saved',
+    calories:'Calories', protein:'Protein', carbs:'Carbs', fat:'Fat',
+    add:'Add', meal_title:'Save Meal', food_name:'Food Name',
+    save_goals:'Save Goals', goals_saved:'Goals saved!', daily_goals:'⚙ Daily Goals',
+    add_activity:'+ Add Activity for this day', change:'Change', reset_split:'↩ Reset to split plan',
+    custom_today:'Custom for today', planned:'Planned',
+    no_plans:'No plans yet', create_plan:'+ Create Plan', new_plan:'+ New Plan',
+    resume:'Resume', start:'▶ Start', plan_name:'Plan Name', color:'Color',
+    choose_ex:'+ Choose Exercises', edit_ex:'Manage Exercises', create:'Create Plan',
+    save_changes:'Save Changes', new_plan_title:'New Plan', edit_plan_title:'Edit Plan',
+    selected:'selected', no_ex_found:'No exercises found',
+    add_custom_ex:'+ Add Custom Exercise', save_plan:'Save Plan', target_km:'Target km',
+    cancel_workout:'✕ Cancel', finish_workout:'✓ Finish',
+    last_sets:'Last:', no_history:'No history', add_set:'+ Add Set',
+    min_set:'Need at least 1 set', machine_settings:'Machine Settings',
+    settings_for:'Settings for', locker_prompt:'Locker / Spindle (optional)',
+    start_workout:'▶ Start Workout',
+    no_workouts:'No workouts yet', sets_total:'sets total', tap_edit:'tap to edit',
+    duration:'Duration', all_plans:'All Plans',
+    run_log_title:'Log Run', run_saved:'Run saved! 🏃',
+    no_runs:'No runs yet', type:'Type', all:'All', normal:'Normal', interval:'Interval', tempo:'Tempo',
+    distance_km:'Distance (km)', total_time:'Total Time (hh:mm:ss)',
+    intervals_n:'Number of Intervals', work_time:'Work Time (hh:mm:ss)', rest_time:'Rest Time (hh:mm:ss)',
+    save_run:'Save Run', run_loggen:'+ Log Run',
+    this_week:'This Week', avg_calories:'Avg Calories', avg_protein:'Avg Protein',
+    days_7:'7 Days', days_30:'30 Days', total:'Total',
+    nutrition_section:'Nutrition', body_weight_section:'Body Weight', weight_kg:'Weight (kg)',
+    steps_per_day:'Steps per Day', gym_progress:'Gym Progress', running_section:'Running',
+    pace_chart:'Pace — Normal Runs (min/km)', weekly_dist:'Weekly Distance (km)',
+    no_hist:'No workout history yet', avg_weight:'Avg weight per session (kg)',
+    settings:'Settings', theme:'Theme', dark:'🌙 Dark', light:'☀️ Light',
+    step_goal:'Step Goal', reminders:'Reminders', no_reminders:'No reminders',
+    add_reminder:'+ Add Reminder', reminder_title:'Add Reminder',
+    reminder_text:'Text', reminder_time:'Time', reminder_saved:'Reminder saved!',
+    language:'Language', weight_logged:'kg logged!', steps_saved:'Steps saved!',
+    food_saved:'Food saved!', enter_name:'Enter name',
+    edit_food_title:'Edit Food', activity_set:'Activity set!', reset_done:'Reset to split',
+    splits_tab:'Splits', plans_tab:'Plans', history_tab:'History', running_tab:'Running',
+    custom_ex_title:'Custom Exercise', ex_name:'Exercise Name', muscle_group:'Muscle Group',
+    interval_chart:'⚡ Interval Sessions — Reps per Session',
+  },
+};
+const lang = () => (load(SK.SETTINGS, {}).language || 'de');
+const t = k => TR[lang()]?.[k] ?? TR.de[k] ?? k;
+
+/* ═══════════════════════════════════════════════════════════
    NAVIGATION
 ═══════════════════════════════════════════════════════════ */
-const TAB_TITLES = { nutrition:'Nutrition', workouts:'Workouts', analytics:'Analytics' };
+const TAB_TITLES = () => ({ nutrition:t('tab_nutrition'), workouts:t('tab_workouts'), analytics:t('tab_analytics') });
 
 function switchTab(tab) {
   state.tab = tab;
@@ -191,10 +305,11 @@ function switchTab(tab) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById(`tab-${tab}`).classList.add('active');
   document.querySelector(`.nav-btn[data-tab="${tab}"]`).classList.add('active');
-  document.getElementById('topbarTitle').textContent = TAB_TITLES[tab];
+  document.getElementById('topbarTitle').textContent = TAB_TITLES()[tab];
   renderCurrentTab();
 }
 function renderCurrentTab() {
+  document.getElementById('topbarTitle').textContent = TAB_TITLES()[state.tab];
   if (state.tab === 'nutrition') renderNutrition();
   else if (state.tab === 'workouts') renderWorkouts();
   else renderAnalytics();
@@ -262,7 +377,7 @@ function renderNutrition() {
   const days = getDaysInMonth(y, m);
   const firstDOW = getFirstDOW(y, m);
   const goals = getGoals();
-  const t = todayStr();
+  const t_today = todayStr();
 
   const suppls = getSupplements();
   const supplLog = suppls.length ? getSupplLog() : {};
@@ -286,7 +401,7 @@ function renderNutrition() {
           `<svg viewBox="0 0 8 8" width="6" height="6"><polyline points="1,4 3,6 7,2" stroke="#22c55e" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`
         ).join('')}</div>`
       : '';
-    cells += `<div class="cal-day${ds===t?' today':''}" onclick="openDayView('${ds}')">
+    cells += `<div class="cal-day${ds===t_today?' today':''}" onclick="openDayView('${ds}')">
       <div class="cal-day-num">${d}</div>
       ${sdBadge}
       <div class="cal-mini-bars">
@@ -312,7 +427,7 @@ function renderNutrition() {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
           </button>
         </div>`).join('')
-    : `<div style="color:var(--text3);font-size:13px;padding:16px 0;text-align:center">Keine gespeicherten Mahlzeiten</div>`;
+    : `<div style="color:var(--text3);font-size:13px;padding:16px 0;text-align:center">${t('no_saved_meals')}</div>`;
 
   const supplHtml = supplements.length
     ? supplements.map(s => `
@@ -325,18 +440,18 @@ function renderNutrition() {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
           </button>
         </div>`).join('')
-    : `<div style="color:var(--text3);font-size:13px;padding:16px 0;text-align:center">Keine Supplements eingetragen</div>`;
+    : `<div style="color:var(--text3);font-size:13px;padding:16px 0;text-align:center">${t('no_supplements')}</div>`;
 
-  const tabBtn = (view, label) => {
+  const tabBtn = (view, lbl) => {
     const active = nutView === view;
-    return `<button onclick="state.nutritionView='${view}';renderNutrition()" style="flex:1;padding:7px;border:none;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;background:${active?'var(--accent)':'transparent'};color:${active?'#fff':'var(--text2)'}">${label}</button>`;
+    return `<button onclick="state.nutritionView='${view}';renderNutrition()" style="flex:1;padding:7px;border:none;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;background:${active?'var(--accent)':'transparent'};color:${active?'#fff':'var(--text2)'}">${lbl}</button>`;
   };
 
   el.innerHTML = `
     <div style="display:flex;gap:0;margin-bottom:10px;background:var(--card);border-radius:12px;padding:3px">
-      ${tabBtn('calendar','Kalender')}
-      ${tabBtn('meals','Mahlzeiten')}
-      ${tabBtn('supplements','Supplements')}
+      ${tabBtn('calendar',t('calendar'))}
+      ${tabBtn('meals',t('meals'))}
+      ${tabBtn('supplements',t('supplements'))}
     </div>
     ${nutView === 'calendar' ? `
     <div class="card card-sm">
@@ -350,31 +465,31 @@ function renderNutrition() {
         </button>
       </div>
       <div style="display:flex;gap:14px;font-size:11px;color:var(--text2);padding:0 2px 10px">
-        <span><span style="display:inline-block;width:8px;height:4px;border-radius:2px;background:#22c55e;margin-right:3px;vertical-align:middle"></span>Calories</span>
-        <span><span style="display:inline-block;width:8px;height:4px;border-radius:2px;background:#8b5cf6;margin-right:3px;vertical-align:middle"></span>Protein</span>
-        <span style="margin-left:auto;color:var(--text3)">Green = on track</span>
+        <span><span style="display:inline-block;width:8px;height:4px;border-radius:2px;background:#22c55e;margin-right:3px;vertical-align:middle"></span>${t('calories')}</span>
+        <span><span style="display:inline-block;width:8px;height:4px;border-radius:2px;background:#8b5cf6;margin-right:3px;vertical-align:middle"></span>${t('protein')}</span>
+        <span style="margin-left:auto;color:var(--text3)">${t('on_track')}</span>
       </div>
       <div class="cal-grid">${cells}</div>
     </div>
     <div style="display:flex;gap:8px;padding:2px">
       <button class="btn btn-secondary btn-sm" style="flex:1" onclick="openGoalsModal()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
-        Goals
+        ${t('goals')}
       </button>
-      <button class="btn btn-primary btn-sm" style="flex:1" onclick="openDayView('${t}')">+ Log Today</button>
+      <button class="btn btn-primary btn-sm" style="flex:1" onclick="openDayView('${t_today}')">${t('log_today')}</button>
     </div>`
     : nutView === 'meals' ? `
     <div class="card">
-      <div class="card-title">Gespeicherte Mahlzeiten</div>
+      <div class="card-title">${t('saved_meals')}</div>
       ${repeatMealsHtml}
     </div>
-    <button class="btn btn-primary btn-full mt-8" onclick="openSaveRepeatMealModal()">+ Neue Mahlzeit speichern</button>`
+    <button class="btn btn-primary btn-full mt-8" onclick="openSaveRepeatMealModal()">${t('save_meal')}</button>`
     : `
     <div class="card">
-      <div class="card-title">Supplements</div>
+      <div class="card-title">${t('supplements')}</div>
       ${supplHtml}
     </div>
-    <button class="btn btn-primary btn-full mt-8" onclick="openAddSupplementModal()">+ Supplement hinzufügen</button>`}
+    <button class="btn btn-primary btn-full mt-8" onclick="openAddSupplementModal()">${t('add_supplement')}</button>`}
   `;
 }
 
@@ -457,7 +572,7 @@ function openDayView(dateStr) {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
         </button>
       </div>`).join('')
-    : '<div style="text-align:center;padding:20px 0;color:var(--text2);font-size:14px">No food logged yet</div>';
+    : '<div style="text-align:center;padding:20px 0;color:var(--text2);font-size:14px">${t('no_food')}</div>';
 
   const stepsData = getSteps();
   const todaySteps = stepsData[dateStr] || 0;
@@ -467,14 +582,14 @@ function openDayView(dateStr) {
     <div class="panel-header">
       <button class="panel-back" onclick="closePanel();renderNutrition()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="20" height="20"><polyline points="15 18 9 12 15 6"/></svg>
-        Back
+        ${t('back')}
       </button>
       <span class="panel-title">${fmtShort(dateStr)}</span>
     </div>
     <div class="panel-body">
       ${splitBanner}
       <div class="card" style="margin-bottom:10px">
-        <div class="card-title">Body Weight</div>
+        <div class="card-title">${t('body_weight')}</div>
         ${bwListHtml}
         <div style="display:flex;gap:8px;align-items:center;margin-top:10px">
           <input class="input" id="bw_input" type="number" inputmode="decimal" step="0.1"
@@ -485,12 +600,12 @@ function openDayView(dateStr) {
       <div class="macros-grid">${macroBoxes}</div>
       <div class="card">${bars}</div>
       <div class="card">
-        <div class="card-title">Food Log</div>
+        <div class="card-title">${t('food_log')}</div>
         ${foodsHtml}
-        <button class="btn btn-secondary btn-sm" style="margin-top:10px;width:100%" onclick="openAddFoodModal('${dateStr}')">+ Essen hinzufügen</button>
+        <button class="btn btn-secondary btn-sm" style="margin-top:10px;width:100%" onclick="openAddFoodModal('${dateStr}')">${t('add_food')}</button>
       </div>
       <div class="card mt-12">
-        <div class="card-title">Schritte</div>
+        <div class="card-title">${t('steps')}</div>
         <div style="display:flex;gap:8px;align-items:center">
           <input class="input" id="steps_input" type="number" inputmode="numeric" placeholder="z.B. 8500"
             value="${todaySteps || ''}" style="flex:1;text-align:right;font-size:16px;font-weight:700;padding:9px 12px">
@@ -516,31 +631,31 @@ function openAddFoodModal(dateStr) {
 
   openOverlay(`
     <div style="display:flex;gap:6px;margin-bottom:14px">
-      <button id="tab_new" onclick="toggleFoodTab('new','${dateStr}')" style="flex:1;padding:8px;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;background:var(--accent);color:#fff">Neue Mahlzeit</button>
-      <button id="tab_saved" onclick="toggleFoodTab('saved','${dateStr}')" style="flex:1;padding:8px;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;background:var(--card);color:var(--text2)">Gespeicherte</button>
+      <button id="tab_new" onclick="toggleFoodTab('new','${dateStr}')" style="flex:1;padding:8px;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;background:var(--accent);color:#fff">${t('new_meal')}</button>
+      <button id="tab_saved" onclick="toggleFoodTab('saved','${dateStr}')" style="flex:1;padding:8px;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;background:var(--card);color:var(--text2)">${t('saved')}</button>
     </div>
     <div id="food_tab_new">
       <div class="input-group">
-        <label class="input-label">Food Name</label>
+        <label class="input-label">${t('food_name')}</label>
         <input class="input" id="fn_name" type="text" placeholder="z.B. Haferflocken mit Milch">
       </div>
       <div class="input-row">
         <div class="input-group">
-          <label class="input-label">Calories</label>
+          <label class="input-label">${t('calories')}</label>
           <input class="input" id="fn_cal" type="number" inputmode="decimal" placeholder="0">
         </div>
         <div class="input-group">
-          <label class="input-label">Protein (g)</label>
+          <label class="input-label">${t('protein')} (g)</label>
           <input class="input" id="fn_pro" type="number" inputmode="decimal" placeholder="0">
         </div>
       </div>
       <div class="input-row">
         <div class="input-group">
-          <label class="input-label">Carbs (g)</label>
+          <label class="input-label">${t('carbs')} (g)</label>
           <input class="input" id="fn_carb" type="number" inputmode="decimal" placeholder="0">
         </div>
         <div class="input-group">
-          <label class="input-label">Fat (g)</label>
+          <label class="input-label">${t('fat')} (g)</label>
           <input class="input" id="fn_fat" type="number" inputmode="decimal" placeholder="0">
         </div>
       </div>
@@ -599,7 +714,7 @@ function openSaveRepeatMealModal() {
         <input class="input" id="rm_fat" type="number" inputmode="decimal" placeholder="0">
       </div>
     </div>
-    <button class="btn btn-primary btn-full mt-8" onclick="submitRepeatMeal()">Speichern</button>`, 'Mahlzeit speichern');
+    <button class="btn btn-primary btn-full mt-8" onclick="submitRepeatMeal()">Speichern</button>`, t('meal_title'));
   setTimeout(() => document.getElementById('rm_name')?.focus(), 80);
 }
 
@@ -617,7 +732,7 @@ function submitRepeatMeal() {
   save(SK.REPEAT_MEALS, meals);
   closeOverlay();
   renderNutrition();
-  showToast('Mahlzeit gespeichert!');
+  showToast('${t('meal_saved')}');
 }
 
 function deleteRepeatMeal(id) {
@@ -630,15 +745,15 @@ function openAddSupplementModal() {
   openOverlay(`
     <div style="display:flex;flex-direction:column;gap:12px">
       <div class="input-group">
-        <label class="input-label">Name</label>
+        <label class="input-label">${t('name')}</label>
         <input class="input" id="suppl_name" type="text" placeholder="z.B. Vitamin D3">
       </div>
       <div class="input-group">
-        <label class="input-label">Dosierung (optional)</label>
+        <label class="input-label">${t('dosage')}</label>
         <input class="input" id="suppl_dose" type="text" placeholder="z.B. 1000 IE, 2 Kapseln">
       </div>
       <button class="btn btn-primary btn-full" onclick="saveNewSupplement()">Speichern</button>
-    </div>`, 'Supplement hinzufügen');
+    </div>`, t('add_supplement'));
 }
 
 function saveNewSupplement() {
@@ -650,7 +765,7 @@ function saveNewSupplement() {
   save(SK.SUPPLEMENTS, suppl);
   closeOverlay();
   renderNutrition();
-  showToast('Supplement gespeichert!');
+  showToast('${t('supplement_saved')}');
 }
 
 function deleteSupplement(id) {
@@ -680,7 +795,7 @@ function renderDaySupplements(dateStr) {
     </div>`;
   }).join('');
   return `<div class="card mt-12">
-    <div class="card-title">Supplements</div>
+    <div class="card-title">${t('supplements')}</div>
     ${rows}
   </div>`;
 }
@@ -710,7 +825,7 @@ function submitFood(dateStr) {
   save(SK.NUTRITION, data);
   closeOverlay();
   openDayView(dateStr);
-  showToast('Food saved!');
+  showToast('${t('food_saved')}');
 }
 
 function deleteFood(dateStr, foodId) {
@@ -727,15 +842,15 @@ function openEditFoodModal(dateStr, foodId) {
     <div style="display:flex;flex-direction:column;gap:10px">
       <div class="input-group"><label class="input-label">Name</label><input class="input" id="ef_name" type="text" value="${esc(f.name)}"></div>
       <div class="input-row">
-        <div class="input-group"><label class="input-label">Kalorien</label><input class="input" id="ef_cal" type="number" inputmode="decimal" value="${f.calories}"></div>
+        <div class="input-group"><label class="input-label">${t('calories')}</label><input class="input" id="ef_cal" type="number" inputmode="decimal" value="${f.calories}"></div>
         <div class="input-group"><label class="input-label">Protein (g)</label><input class="input" id="ef_pro" type="number" inputmode="decimal" value="${f.protein}"></div>
       </div>
       <div class="input-row">
-        <div class="input-group"><label class="input-label">Kohlenhydrate (g)</label><input class="input" id="ef_carb" type="number" inputmode="decimal" value="${f.carbs}"></div>
-        <div class="input-group"><label class="input-label">Fett (g)</label><input class="input" id="ef_fat" type="number" inputmode="decimal" value="${f.fat}"></div>
+        <div class="input-group"><label class="input-label">${t('carbs')} (g)</label><input class="input" id="ef_carb" type="number" inputmode="decimal" value="${f.carbs}"></div>
+        <div class="input-group"><label class="input-label">${t('fat')} (g)</label><input class="input" id="ef_fat" type="number" inputmode="decimal" value="${f.fat}"></div>
       </div>
       <button class="btn btn-primary btn-full" onclick="saveEditFood('${dateStr}','${foodId}')">Speichern</button>
-    </div>`, 'Gericht bearbeiten');
+    </div>`, t('edit_food_title'));
 }
 
 function saveEditFood(dateStr, foodId) {
@@ -762,12 +877,12 @@ function saveSteps(dateStr) {
   const steps = getSteps();
   steps[dateStr] = val;
   save(SK.STEPS, steps);
-  showToast('Schritte gespeichert!');
+  showToast('${t('steps_saved')}');
   openDayView(dateStr);
 }
 
 function openAddRunFromDay(dateStr) {
-  openOverlay(`${runFormHTML({ date: dateStr })}<button class="btn btn-primary btn-full mt-8" onclick="saveRunFromDay('${dateStr}')">Run speichern</button>`, 'Run loggen');
+  openOverlay(`${runFormHTML({ date: dateStr })}<button class="btn btn-primary btn-full mt-8" onclick="saveRunFromDay('${dateStr}')">Run speichern</button>`, t('run_log_title'));
 }
 
 function saveRunFromDay(dateStr) {
@@ -775,7 +890,7 @@ function saveRunFromDay(dateStr) {
   run.id = uid();
   const runs = getRuns(); runs.unshift(run); save(SK.RUNS, runs);
   closeOverlay();
-  showToast('Run gespeichert! 🏃');
+  showToast('${t('run_saved')}');
   openDayView(dateStr);
 }
 
@@ -829,7 +944,7 @@ function openActivityOverride(dateStr) {
         <span style="font-size:16px">✏️</span> Custom…
       </button>
       ${hasOverride ? `<div class="divider" style="margin:12px 0"></div>
-        <button class="btn btn-secondary btn-full" onclick="clearDayActivity('${dateStr}')">↩ Reset to split plan</button>` : ''}
+        <button class="btn btn-secondary btn-full" onclick="clearDayActivity('${dateStr}')">↩ ${t('reset_done')} plan</button>` : ''}
     </div>
   `, 'Activity for ' + fmtShort(dateStr));
 }
@@ -842,7 +957,7 @@ function setDayActivity(dateStr, type, planId, label) {
   save(SK.NUTRITION, data);
   closeOverlay();
   openDayView(dateStr);
-  showToast('Activity set!');
+  showToast('${t('activity_set')}');
 }
 
 function openCustomDayActivity(dateStr) {
@@ -861,14 +976,14 @@ function clearDayActivity(dateStr) {
   if (data[dateStr]) { delete data[dateStr].activityOverride; save(SK.NUTRITION, data); }
   closeOverlay();
   openDayView(dateStr);
-  showToast('Reset to split');
+  showToast('${t('reset_done')}');
 }
 
 function openGoalsModal() {
   const g = getGoals();
   openOverlay(`
     <div class="input-row">
-      <div class="input-group"><label class="input-label">Calories (kcal)</label><input class="input" id="g_cal" type="number" inputmode="decimal" value="${g.calories}"></div>
+      <div class="input-group"><label class="input-label">${t('calories')} (kcal)</label><input class="input" id="g_cal" type="number" inputmode="decimal" value="${g.calories}"></div>
       <div class="input-group"><label class="input-label">Protein (g)</label><input class="input" id="g_pro" type="number" inputmode="decimal" value="${g.protein}"></div>
     </div>
     <div class="input-row">
@@ -885,7 +1000,7 @@ function saveGoals() {
     carbs:    parseFloat(document.getElementById('g_carb')?.value) || 300,
     fat:      parseFloat(document.getElementById('g_fat')?.value) || 70,
   });
-  closeOverlay(); renderNutrition(); showToast('Goals saved!');
+  closeOverlay(); renderNutrition(); showToast('${t('goals_saved')}');
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -926,8 +1041,9 @@ function getAnalyticsDays() {
 function renderWorkouts() {
   const el = document.getElementById('tab-workouts');
   const sub = state.workoutSubTab;
-  const tabs = ['plans','splits','history','running'].map(t =>
-    `<button class="sub-tab${sub===t?' active':''}" onclick="switchWorkoutSub('${t}')">${t.charAt(0).toUpperCase()+t.slice(1)}</button>`
+  const subLabels = { plans:t('plans_tab'), splits:t('splits_tab'), history:t('history_tab'), running:t('running_tab') };
+  const tabs = ['plans','splits','history','running'].map(s =>
+    `<button class="sub-tab${sub===s?' active':''}" onclick="switchWorkoutSub('${s}')">${subLabels[s]}</button>`
   ).join('');
   el.innerHTML = `<div class="sub-tabs">${tabs}</div><div id="wo-sub"></div>`;
   if (sub === 'plans') renderPlans();
@@ -947,16 +1063,16 @@ function renderPlans() {
   if (aw) banner = `<div class="card" style="border-color:var(--accent);background:var(--accent-glow);margin-bottom:10px">
     <div style="display:flex;align-items:center;justify-content:space-between">
       <div><div style="font-weight:700">Workout in progress</div><div style="font-size:12px;color:var(--text2)">${esc(aw.planName)}</div></div>
-      <button class="btn btn-primary btn-sm" onclick="resumeWorkout()">Resume</button>
+      <button class="btn btn-primary btn-sm" onclick="resumeWorkout()">${t('resume')}</button>
     </div>
   </div>`;
 
   if (!plans.length) {
     el.innerHTML = banner + `<div class="empty-state">
       <div class="empty-icon">🏋️</div>
-      <div class="empty-title">No plans yet</div>
+      <div class="empty-title">${t('no_plans')}</div>
       <div class="empty-sub">Create your first workout plan — Push, Pull, Legs, or anything you like.</div>
-      <button class="btn btn-primary" onclick="openNewPlan()">+ Create Plan</button>
+      <button class="btn btn-primary" onclick="openNewPlan()">${t('create_plan')}</button>
     </div>`;
     return;
   }
@@ -972,14 +1088,14 @@ function renderPlans() {
       <div class="plan-card-body">
         <div class="plan-ex-chips">${chips}${more}</div>
         <div class="plan-actions">
-          <button class="btn btn-primary btn-sm" style="flex:1" onclick="startWorkout('${p.id}')">▶ Start</button>
-          <button class="btn btn-secondary btn-sm" onclick="openEditPlan('${p.id}')">Edit</button>
+          <button class="btn btn-primary btn-sm" style="flex:1" onclick="startWorkout('${p.id}')">${t('start')}</button>
+          <button class="btn btn-secondary btn-sm" onclick="openEditPlan('${p.id}')">${t('edit')}</button>
           <button class="btn btn-danger btn-sm" onclick="deletePlan('${p.id}')">✕</button>
         </div>
       </div>
     </div>`;
   }).join('');
-  el.innerHTML = banner + html + `<button class="btn btn-secondary btn-full mt-8" onclick="openNewPlan()">+ New Plan</button>`;
+  el.innerHTML = banner + html + `<button class="btn btn-secondary btn-full mt-8" onclick="openNewPlan()">${t('new_plan')}</button>`;
 }
 
 /* ── Plan Modal ─────────────────────────────────────────── */
@@ -1038,11 +1154,11 @@ function renderPlanExList() {
 function openNewPlan(preserveSelection = false) {
   if (!preserveSelection) { state.pickerSelected = []; state.pickerMachineSettings = {}; state.pickerPlanColor = PLAN_COLORS[0]; }
   openOverlay(`
-    <div class="input-group"><label class="input-label">Plan Name</label><input class="input" id="pn_name" type="text" placeholder="e.g. Push Day" value="${esc(state.pickerPlanName||'')}"></div>
-    <div class="input-group"><label class="input-label">Color</label><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">${colorSwatches(state.pickerPlanColor)}</div></div>
-    <button class="btn btn-secondary btn-full" style="margin-bottom:10px" onclick="openExPicker(null,'new')">+ Übungen wählen <span style="color:var(--accent)">${state.pickerSelected.length ? '('+state.pickerSelected.length+')' : ''}</span></button>
+    <div class="input-group"><label class="input-label">${t('plan_name')}</label><input class="input" id="pn_name" type="text" placeholder="e.g. Push Day" value="${esc(state.pickerPlanName||'')}"></div>
+    <div class="input-group"><label class="input-label">${t('color')}</label><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">${colorSwatches(state.pickerPlanColor)}</div></div>
+    <button class="btn btn-secondary btn-full" style="margin-bottom:10px" onclick="openExPicker(null,'new')">${t('choose_ex')} <span style="color:var(--accent)">${state.pickerSelected.length ? '('+state.pickerSelected.length+')' : ''}</span></button>
     ${renderPlanExList()}
-    <button class="btn btn-primary btn-full" onclick="savePlan(null)">Plan erstellen</button>`, 'Neuer Plan');
+    <button class="btn btn-primary btn-full" onclick="savePlan(null)">${t('create')}</button>`, 'Neuer Plan');
 }
 
 function openEditPlan(planId) {
@@ -1060,9 +1176,9 @@ function openEditPlan(planId) {
   openOverlay(`
     <div class="input-group"><label class="input-label">Plan Name</label><input class="input" id="pn_name" type="text" value="${esc(plan.name)}"></div>
     <div class="input-group"><label class="input-label">Color</label><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">${colorSwatches(state.pickerPlanColor)}</div></div>
-    <button class="btn btn-secondary btn-full" style="margin-bottom:10px" onclick="openExPicker('${planId}','edit')">Übungen bearbeiten <span style="color:var(--accent)">(${state.pickerSelected.length})</span></button>
+    <button class="btn btn-secondary btn-full" style="margin-bottom:10px" onclick="openExPicker('${planId}','edit')">${t('edit_ex')} <span style="color:var(--accent)">(${state.pickerSelected.length})</span></button>
     ${renderPlanExList()}
-    <button class="btn btn-primary btn-full" onclick="savePlan('${planId}')">Änderungen speichern</button>`, 'Plan bearbeiten');
+    <button class="btn btn-primary btn-full" onclick="savePlan('${planId}')">${t('save_changes')}</button>`, 'Plan bearbeiten');
 }
 
 function savePlan(planId) {
@@ -1149,7 +1265,7 @@ function renderExPicker(planId, mode) {
       <button class="panel-back" onclick="closePanel();${backCall}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="20" height="20"><polyline points="15 18 9 12 15 6"/></svg> Cancel
       </button>
-      <span class="panel-title">${state.pickerSelected.length} selected</span>
+      <span class="panel-title">${state.pickerSelected.length} ${t('selected')}</span>
       <button class="panel-action" onclick="closePanel();${saveCall}">Save</button>
     </div>
     <div class="panel-body">
@@ -1158,8 +1274,8 @@ function renderExPicker(planId, mode) {
       <div class="ex-picker-groups" style="margin:10px 0">${groupTabs}</div>
       <div class="ex-list">${rows || '<div style="text-align:center;padding:20px;color:var(--text2)">No exercises found</div>'}</div>
       <div class="divider" style="margin:14px 0"></div>
-      <button class="btn btn-secondary btn-full" onclick="openCustomEx('${planId}','${mode}')">+ Add Custom Exercise</button>
-      <button class="btn btn-primary btn-full mt-8" onclick="closePanel();${saveCall}">Save Plan</button>
+      <button class="btn btn-secondary btn-full" onclick="openCustomEx('${planId}','${mode}')">${t('add_custom_ex')}</button>
+      <button class="btn btn-primary btn-full mt-8" onclick="closePanel();${saveCall}">${t('save_plan')}</button>
     </div>`);
 }
 
@@ -1181,9 +1297,9 @@ function toggleEx(id, planId, mode) {
 
 function openCustomEx(planId, mode) {
   openOverlay(`
-    <div class="input-group"><label class="input-label">Exercise Name</label><input class="input" id="ce_name" type="text" placeholder="e.g. Cable Fly"></div>
+    <div class="input-group"><label class="input-label">${t('ex_name')}</label><input class="input" id="ce_name" type="text" placeholder="e.g. Cable Fly"></div>
     <div class="input-group">
-      <label class="input-label">Muscle Group</label>
+      <label class="input-label">${t('muscle_group')}</label>
       <select class="input" id="ce_group">
         ${Object.keys(GROUP_COLORS).map(g=>`<option value="${g}">${g}</option>`).join('')}
       </select>
@@ -1231,7 +1347,7 @@ function promptStartWorkout(planId) {
         startWorkout('${planId}', v||null);
       ">▶ Training starten</button>
       <button class="btn btn-secondary btn-full" onclick="closeOverlay()">Abbrechen</button>
-    </div>`, 'Training starten');
+    </div>`, t('start_workout'));
   setTimeout(() => document.getElementById('lockerInput')?.focus(), 100);
 }
 
@@ -1302,7 +1418,7 @@ function renderWorkoutSession() {
           ${ex.seatPos ? `<div style="font-size:13px;color:var(--text2);margin-bottom:8px">Ziel: <b>${esc(ex.seatPos)} km</b></div>` : ''}
           <button class="btn btn-primary btn-sm" onclick="closePanel();switchWorkoutSub('running');openAddRun()">🏃 Run jetzt loggen</button>
         </div>`
-      : `${machineInfo}<div class="workout-sets">${setsHtml}<button class="add-set-btn" onclick="addSet(${ei})">+ Add Set</button></div>`;
+      : `${machineInfo}<div class="workout-sets">${setsHtml}<button class="add-set-btn" onclick="addSet(${ei})">${t('add_set')}</button></div>`;
     return `<div class="workout-ex-card">
       <div class="workout-ex-header">
         <div class="ex-badge" style="background:${col};width:32px;height:32px;border-radius:8px;font-size:10px">${abbr}</div>
@@ -1330,8 +1446,8 @@ function renderWorkoutSession() {
         </div>
         <div id="wo-timer" class="workout-timer">00:00</div>
         <div style="display:flex;gap:6px">
-          <button class="btn btn-danger btn-sm" onclick="cancelWorkout()">✕ Cancel</button>
-          <button class="btn btn-primary btn-sm" onclick="finishWorkout()">✓ Finish</button>
+          <button class="btn btn-danger btn-sm" onclick="cancelWorkout()">${t('cancel_workout')}</button>
+          <button class="btn btn-primary btn-sm" onclick="finishWorkout()">${t('finish_workout')}</button>
         </div>
       </div>
       <div class="workout-exercises" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px">${exHtml}</div>
@@ -1399,7 +1515,7 @@ function openMachineSettings(ei) {
         saveMachineSettings(${ei}, s||null, c||null);
       ">Speichern</button>
       <button class="btn btn-secondary btn-full" onclick="closeOverlay()">Abbrechen</button>
-    </div>`, 'Maschineneinstellung');
+    </div>`, t('machine_settings'));
 }
 function saveMachineSettings(ei, seatPos, chestSupport) {
   const aw = state.activeWorkout; if (!aw) return;
@@ -1459,12 +1575,12 @@ function renderHistory() {
   const hist = getHistory();
   const el = document.getElementById('wo-sub');
   if (!hist.length) {
-    el.innerHTML = `<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">No workouts yet</div><div class="empty-sub">Start a workout from Plans and it'll appear here.</div></div>`;
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">${t('no_workouts')}</div><div class="empty-sub">Start a workout from Plans and it'll appear here.</div></div>`;
     return;
   }
   const planNames = [...new Set(hist.map(w => w.planName).filter(Boolean))];
   const filterSel = planNames.length > 1 ? `<select class="input" style="margin-bottom:10px" onchange="state.historyFilter=this.value;renderHistory()">
-    <option value="">Alle Pläne</option>
+    <option value="">${t('all_plans')}</option>
     ${planNames.map(n=>`<option value="${esc(n)}"${n===state.historyFilter?' selected':''}>${esc(n)}</option>`).join('')}
   </select>` : '';
   const filtered = state.historyFilter ? hist.filter(w => w.planName === state.historyFilter) : hist;
@@ -1479,7 +1595,7 @@ function renderHistory() {
         <span class="hist-date">${fmtShort(wo.date||'')}${dur?' · '+dur:''}</span>
       </div>
       <div class="hist-ex-list">${esc(exNames+more)||'—'}</div>
-      <div style="font-size:11px;color:var(--text3);margin-top:4px">${totalSets} sets total · tap to edit</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:4px">${totalSets} ${t('sets_total')} · ${t('tap_edit')}</div>
     </div>`;
   }).join('');
 }
@@ -1531,7 +1647,7 @@ function openEditWorkout(woId) {
       <div style="display:flex;gap:8px;margin-bottom:14px">
         <div class="macro-box" style="flex:1"><div class="macro-val">${fmtShort(wo.date||'')}</div><div class="macro-lbl">Date</div></div>
         <div class="macro-box" style="flex:1"><div class="macro-val">${wo.duration?Math.floor(wo.duration/60):'—'}</div><div class="macro-unit">${wo.duration?'min':''}</div><div class="macro-lbl">Duration</div></div>
-        <div class="macro-box" style="flex:1"><div class="macro-val">${(wo.exercises||[]).reduce((s,e)=>s+(e.sets?.length||0),0)}</div><div class="macro-lbl">Total Sets</div></div>
+        <div class="macro-box" style="flex:1"><div class="macro-val">${(wo.exercises||[]).reduce((s,e)=>s+(e.sets?.length||0),0)}</div><div class="macro-lbl">${t('sets_total')}</div></div>
       </div>
       ${exHtml}
     </div>`);
@@ -1603,16 +1719,16 @@ function onTimeBlur(el) {
 function renderRunningList() {
   const runs = getRuns();
   const el = document.getElementById('wo-sub');
-  const addBtn = `<button class="btn btn-primary btn-full" style="margin-bottom:10px" onclick="openAddRun()">+ Run loggen</button>`;
+  const addBtn = `<button class="btn btn-primary btn-full" style="margin-bottom:10px" onclick="openAddRun()">${t('run_loggen')}</button>`;
   if (!runs.length) {
-    el.innerHTML = addBtn + `<div class="empty-state" style="padding-top:16px"><div class="empty-icon">🏃</div><div class="empty-title">No runs yet</div><div class="empty-sub">Log your first run to track your pace and distance over time.</div></div>`;
+    el.innerHTML = addBtn + `<div class="empty-state" style="padding-top:16px"><div class="empty-icon">🏃</div><div class="empty-title">${t('no_runs')}</div><div class="empty-sub">Log your first run to track your pace and distance over time.</div></div>`;
     return;
   }
   const typeFilter = state.runTypeFilter || 'all';
   const filterBar = `<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
     ${['all','normal','interval','tempo'].map(t => {
       const active = typeFilter === t;
-      const labels = { all:'Alle', normal:'Normal', interval:'Intervall', tempo:'Tempo' };
+      const labels = { all:t('all'), normal:t('normal'), interval:t('interval'), tempo:t('tempo') };
       return `<button onclick="state.runTypeFilter='${t}';renderRunningList()" style="padding:4px 12px;font-size:12px;font-weight:600;border-radius:8px;border:none;cursor:pointer;background:${active?'var(--accent)':'var(--card2)'};color:${active?'#fff':'var(--text2)'}">${labels[t]}</button>`;
     }).join('')}
   </div>`;
@@ -1654,9 +1770,9 @@ function runFormHTML(r = {}) {
   const isInt = rt === 'interval';
   const isTempo = rt === 'tempo';
   return `
-    <div class="input-group"><label class="input-label">Datum</label><input class="input" id="r_date" type="date" value="${r.date||todayStr()}"></div>
+    <div class="input-group"><label class="input-label">${t('date')}</label><input class="input" id="r_date" type="date" value="${r.date||todayStr()}"></div>
     <div class="input-group">
-      <label class="input-label">Typ</label>
+      <label class="input-label">${t('type')}</label>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         <button type="button" id="r_type_normal" onclick="setRunType('normal')"
           class="btn btn-sm" style="flex:1;${!isInt&&!isTempo?'background:var(--accent);color:#fff':'background:var(--card2);color:var(--text)'}">Normal</button>
@@ -1666,7 +1782,7 @@ function runFormHTML(r = {}) {
           class="btn btn-sm" style="flex:1;${isTempo?'background:#ef4444;color:#fff':'background:var(--card2);color:var(--text)'}">Tempo</button>
       </div>
     </div>
-    <div class="input-group"><label class="input-label">Distance (km)</label><input class="input" id="r_dist" type="number" inputmode="decimal" step="0.01" placeholder="5.0" value="${r.distance||''}"></div>
+    <div class="input-group"><label class="input-label">${t('distance_km')}</label><input class="input" id="r_dist" type="number" inputmode="decimal" step="0.01" placeholder="5.0" value="${r.distance||''}"></div>
     <div id="r_normal_fields" style="display:${isInt?'none':'block'}">
       <div class="input-group">
         <label class="input-label">Total Time (hh:mm:ss — type digits only)</label>
@@ -2872,29 +2988,36 @@ function openSettings() {
   openPanel(`
     <div class="panel-header">
       <button class="panel-back" onclick="closePanel()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="20" height="20"><polyline points="15 18 9 12 15 6"/></svg> Zurück
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="20" height="20"><polyline points="15 18 9 12 15 6"/></svg> ${t('back')}
       </button>
-      <span class="panel-title">Einstellungen</span>
+      <span class="panel-title">${t('settings')}</span>
     </div>
     <div class="panel-body">
       <div class="card" style="margin-bottom:12px">
-        <div class="card-title">Design</div>
+        <div class="card-title">${t('language')}</div>
         <div style="display:flex;gap:8px">
-          <button onclick="setTheme('dark')" style="flex:1;padding:10px;border-radius:10px;border:2px solid ${isDark?'var(--accent)':'var(--border)'};background:${isDark?'var(--accent)18':'transparent'};cursor:pointer;font-size:13px;font-weight:600;color:var(--text1)">🌙 Dunkel</button>
-          <button onclick="setTheme('light')" style="flex:1;padding:10px;border-radius:10px;border:2px solid ${!isDark?'var(--accent)':'var(--border)'};background:${!isDark?'var(--accent)18':'transparent'};cursor:pointer;font-size:13px;font-weight:600;color:var(--text1)">☀️ Hell</button>
+          <button onclick="setLang('de')" style="flex:1;padding:10px;border-radius:10px;border:2px solid ${lang()==='de'?'var(--accent)':'var(--border)'};background:${lang()==='de'?'var(--accent)18':'transparent'};cursor:pointer;font-size:13px;font-weight:600;color:var(--text1)">🇩🇪 Deutsch</button>
+          <button onclick="setLang('en')" style="flex:1;padding:10px;border-radius:10px;border:2px solid ${lang()==='en'?'var(--accent)':'var(--border)'};background:${lang()==='en'?'var(--accent)18':'transparent'};cursor:pointer;font-size:13px;font-weight:600;color:var(--text1)">🇬🇧 English</button>
         </div>
       </div>
       <div class="card" style="margin-bottom:12px">
-        <div class="card-title">Schrittziel</div>
+        <div class="card-title">${t('theme')}</div>
+        <div style="display:flex;gap:8px">
+          <button onclick="setTheme('dark')" style="flex:1;padding:10px;border-radius:10px;border:2px solid ${isDark?'var(--accent)':'var(--border)'};background:${isDark?'var(--accent)18':'transparent'};cursor:pointer;font-size:13px;font-weight:600;color:var(--text1)">${t('dark')}</button>
+          <button onclick="setTheme('light')" style="flex:1;padding:10px;border-radius:10px;border:2px solid ${!isDark?'var(--accent)':'var(--border)'};background:${!isDark?'var(--accent)18':'transparent'};cursor:pointer;font-size:13px;font-weight:600;color:var(--text1)">${t('light')}</button>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-title">${t('step_goal')}</div>
         <div style="display:flex;gap:8px;align-items:center">
-          <input class="input" id="set_stepgoal" type="number" inputmode="numeric" placeholder="z.B. 10000" value="${s.stepGoal||''}" style="flex:1">
-          <button class="btn btn-primary btn-sm" onclick="saveSettingsField('stepGoal',parseInt(document.getElementById('set_stepgoal').value)||0);showToast('Gespeichert!')">OK</button>
+          <input class="input" id="set_stepgoal" type="number" inputmode="numeric" placeholder="10000" value="${s.stepGoal||''}" style="flex:1">
+          <button class="btn btn-primary btn-sm" onclick="saveSettingsField('stepGoal',parseInt(document.getElementById('set_stepgoal').value)||0);showToast(t('save'))">OK</button>
         </div>
       </div>
       <div class="card" style="margin-bottom:12px">
-        <div class="card-title">Erinnerungen</div>
+        <div class="card-title">${t('reminders')}</div>
         ${remHtml}
-        <button class="btn btn-primary btn-sm" style="margin-top:10px;width:100%" onclick="openAddReminderModal()">+ Erinnerung hinzufügen</button>
+        <button class="btn btn-primary btn-sm" style="margin-top:10px;width:100%" onclick="openAddReminderModal()">${t('add_reminder')}</button>
       </div>
     </div>`);
 }
@@ -2902,6 +3025,10 @@ function openSettings() {
 function setTheme(theme) {
   const s = load(SK.SETTINGS, {}); s.theme = theme;
   save(SK.SETTINGS, s); loadTheme(); openSettings();
+}
+function setLang(language) {
+  const s = load(SK.SETTINGS, {}); s.language = language;
+  save(SK.SETTINGS, s); renderCurrentTab(); openSettings();
 }
 
 function saveSettingsField(key, value) {
@@ -2912,15 +3039,15 @@ function openAddReminderModal() {
   openOverlay(`
     <div style="display:flex;flex-direction:column;gap:12px">
       <div class="input-group">
-        <label class="input-label">Text</label>
+        <label class="input-label">${t('reminder_text')}</label>
         <input class="input" id="rem_text" type="text" placeholder="z.B. Kreatin nehmen">
       </div>
       <div class="input-group">
-        <label class="input-label">Uhrzeit</label>
+        <label class="input-label">${t('reminder_time')}</label>
         <input class="input" id="rem_time" type="time" value="17:00">
       </div>
       <button class="btn btn-primary btn-full" onclick="saveReminder()">Speichern</button>
-    </div>`, 'Erinnerung hinzufügen');
+    </div>`, t('reminder_title'));
 }
 
 function saveReminder() {
