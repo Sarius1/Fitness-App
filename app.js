@@ -1660,8 +1660,13 @@ function openEditWorkout(woId) {
     </div>
     <div class="panel-body">
       <div style="display:flex;gap:8px;margin-bottom:14px">
-        <div class="macro-box" style="flex:1"><div class="macro-val">${fmtShort(wo.date||'')}</div><div class="macro-lbl">Date</div></div>
-        <div class="macro-box" style="flex:1"><div class="macro-val">${wo.duration?Math.floor(wo.duration/60):'—'}</div><div class="macro-unit">${wo.duration?'min':''}</div><div class="macro-lbl">Duration</div></div>
+        <div class="macro-box" style="flex:1.4">
+          <input type="date" value="${wo.date||''}"
+            style="font-size:13px;font-weight:700;color:var(--text1);background:transparent;border:none;text-align:center;width:100%;cursor:pointer"
+            onchange="saveHistWorkoutDate('${woId}',this.value)">
+          <div class="macro-lbl">${t('date')}</div>
+        </div>
+        <div class="macro-box" style="flex:1"><div class="macro-val">${wo.duration?Math.floor(wo.duration/60):'—'}</div><div class="macro-unit">${wo.duration?'min':''}</div><div class="macro-lbl">${t('duration')}</div></div>
         <div class="macro-box" style="flex:1"><div class="macro-val">${(wo.exercises||[]).reduce((s,e)=>s+(e.sets?.length||0),0)}</div><div class="macro-lbl">${t('sets_total')}</div></div>
       </div>
       ${exHtml}
@@ -1673,6 +1678,14 @@ function updHistSet(woId, ei, si, field, val) {
   const wo = hist.find(w => w.id === woId); if (!wo) return;
   if (wo.exercises[ei]?.sets[si]) wo.exercises[ei].sets[si][field] = val;
   save(SK.HISTORY, hist);
+}
+function saveHistWorkoutDate(woId, newDate) {
+  if (!newDate) return;
+  const hist = getHistory();
+  const wo = hist.find(w => w.id === woId); if (!wo) return;
+  wo.date = newDate;
+  save(SK.HISTORY, hist);
+  showToast(t('save') + ' ✓');
 }
 function addHistSet(woId, ei) {
   const hist = getHistory();
