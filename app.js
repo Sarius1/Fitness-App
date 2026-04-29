@@ -2141,12 +2141,28 @@ function deleteSplit(splitId) {
 /* ── Muscle Model ───────────────────────────────────────── */
 const MUSCLE_GROUPS = ['Chest','Back','Shoulders','Biceps','Triceps','Core','Legs'];
 
-// Returns { group: sessionCount } for the last 28 days (unique workout days per group)
-// Green ≥8 (2+/week), Orange ≥4 (1+/week), Red <4 (<1/week)
+// Returns { counts, green, yellow } based on the selected analytics range.
+// Thresholds scale linearly with days: 2 sessions/week = green, 1 = yellow, 0 = red.
 function getMuscleTrainingStatus() {
   const hist = getHistory();
-  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 28);
-  const cutoffStr = `${cutoff.getFullYear()}-${String(cutoff.getMonth()+1).padStart(2,'0')}-${String(cutoff.getDate()).padStart(2,'0')}`;
+  const range = state.analyticsRange || '30d';
+  let days, cutoffStr;
+  if (range === '7d') {
+    days = 7;
+  } else if (range === '30d') {
+    days = 30;
+  } else {
+    // 'all': use oldest workout date as start
+    const oldest = hist.map(w => w.date).filter(Boolean).sort()[0];
+    if (oldest) {
+      const ms = new Date() - parseDate(oldest);
+      days = Math.max(7, Math.round(ms / 86400000));
+    } else {
+      days = 30;
+    }
+  }
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - days);
+  cutoffStr = `${cutoff.getFullYear()}-${String(cutoff.getMonth()+1).padStart(2,'0')}-${String(cutoff.getDate()).padStart(2,'0')}`;
   const sessionDates = {};
   hist.forEach(wo => {
     if (wo.date < cutoffStr) return;
@@ -2155,28 +2171,35 @@ function getMuscleTrainingStatus() {
   });
   const counts = {};
   Object.entries(sessionDates).forEach(([g, s]) => { counts[g] = s.size; });
+  const weeks = days / 7;
+  counts._green  = Math.round(2 * weeks);
+  counts._yellow = Math.round(1 * weeks);
   return counts;
 }
 
-function muscleFreqColor(sessions) {
-  if (sessions >= 8) return { hex: '#22c55e', rgb: [0.09, 0.68, 0.28] }; // green  2+/week
-  if (sessions >= 4) return { hex: '#f59e0b', rgb: [0.92, 0.55, 0.03] }; // orange 1+/week
-  return                    { hex: '#ef4444', rgb: [0.88, 0.18, 0.18] }; // red    <1/week
+function muscleFreqColor(sessions, status) {
+  const green  = status?._green  ?? 8;
+  const yellow = status?._yellow ?? 4;
+  if (sessions >= green)  return { hex: '#22c55e', rgb: [0.09, 0.68, 0.28] };
+  if (sessions >= yellow) return { hex: '#f59e0b', rgb: [0.92, 0.55, 0.03] };
+  return                         { hex: '#ef4444', rgb: [0.88, 0.18, 0.18] };
 }
 
 function colorMuscleModel(mv, status) {
   if (!mv.model) return;
   mv.model.materials.forEach(mat => {
     if (!MUSCLE_GROUPS.includes(mat.name)) return;
-    const { rgb } = muscleFreqColor(status[mat.name] || 0);
+    const { rgb } = muscleFreqColor(status[mat.name] || 0, status);
     mat.pbrMetallicRoughness.setBaseColorFactor([...rgb, 1.0]);
   });
 }
 
 function muscleStatusColor(group, status) {
   const n = status[group] || 0;
-  if (n >= 8) return 'rgba(34,197,94,0.72)';
-  if (n >= 4) return 'rgba(245,158,11,0.65)';
+  const green  = status?._green  ?? 8;
+  const yellow = status?._yellow ?? 4;
+  if (n >= green)  return 'rgba(34,197,94,0.72)';
+  if (n >= yellow) return 'rgba(245,158,11,0.65)';
   return 'rgba(239,68,68,0.58)';
 }
 
@@ -2281,7 +2304,7 @@ function initAnalyticsMuscleViewer() {
 
   const startGlow = group => {
     stopGlow();
-    const base = muscleFreqColor(status[group] || 0).rgb;
+    const base = muscleFreqColor(status[group] || 0, status).rgb;
     glowPhase = 0;
     const tick = () => {
       glowPhase += 0.07;
