@@ -14,9 +14,27 @@ const SK = {
 };
 const DEFAULT_GOALS = { calories: 2500, protein: 150, carbs: 300, fat: 70 };
 const GROUP_COLORS = {
+  // Broad (backwards-compat)
   'Chest':'#ff6b6b','Back':'#4ecdc4','Shoulders':'#45b7d1',
   'Biceps':'#a8e6cf','Triceps':'#ffd93d','Legs':'#c9b1ff',
   'Core':'#ff9f43','Full Body':'#6c63ff','Custom':'#888','Runs':'#22c55e',
+  // Specific
+  'Upper Chest':'#ff9999',
+  'Lats':'#22d3ee',
+  'Traps':'#06b6d4',
+  'Lower Back':'#0891b2',
+  'Front Delts':'#fb923c',
+  'Side Delts':'#f97316',
+  'Rear Delts':'#ea580c',
+  'Forearms':'#a3e635',
+  'Quads':'#e879f9',
+  'Hamstrings':'#c026d3',
+  'Glutes':'#db2777',
+  'Adductors':'#f43f5e',
+  'Abductors':'#fb7185',
+  'Calves':'#2dd4bf',
+  'Abs':'#facc15',
+  'Obliques':'#ca8a04',
 };
 const PLAN_COLORS = ['#8b5cf6','#3b82f6','#22c55e','#f59e0b','#ef4444','#ec4899','#14b8a6','#f97316'];
 const EXERCISE_DB = [
@@ -92,6 +110,72 @@ const EXERCISE_DB = [
   {id:'r001',name:'Run',group:'Runs'},
   {id:'r002',name:'Intervall Run',group:'Runs'},
   {id:'r003',name:'Tempo Run',group:'Runs'},
+  // Upper Chest
+  {id:'e070',name:'High Cable Fly',group:'Upper Chest'},
+  {id:'e071',name:'Incline Cable Press',group:'Upper Chest'},
+  {id:'e072',name:'Incline Smith Press',group:'Upper Chest'},
+  // Lats
+  {id:'e073',name:'Wide-grip Pull-up',group:'Lats'},
+  {id:'e074',name:'Close-grip Lat Pulldown',group:'Lats'},
+  {id:'e075',name:'Single-arm Cable Row',group:'Lats'},
+  // Traps
+  {id:'e076',name:'Barbell Shrug',group:'Traps'},
+  {id:'e077',name:'Dumbbell Shrug',group:'Traps'},
+  {id:'e078',name:'Rack Pull',group:'Traps'},
+  // Lower Back
+  {id:'e079',name:'Back Extension',group:'Lower Back'},
+  {id:'e080',name:'Good Morning',group:'Lower Back'},
+  {id:'e081',name:'Hyperextension',group:'Lower Back'},
+  // Front Delts
+  {id:'e082',name:'Barbell Front Raise',group:'Front Delts'},
+  {id:'e083',name:'Dumbbell Front Raise',group:'Front Delts'},
+  {id:'e084',name:'Cable Front Raise',group:'Front Delts'},
+  // Side Delts
+  {id:'e085',name:'Dumbbell Lateral Raise',group:'Side Delts'},
+  {id:'e086',name:'Machine Lateral Raise',group:'Side Delts'},
+  {id:'e087',name:'Cable Lateral Raise',group:'Side Delts'},
+  // Rear Delts
+  {id:'e088',name:'Reverse Pec Deck',group:'Rear Delts'},
+  {id:'e089',name:'Band Pull-apart',group:'Rear Delts'},
+  {id:'e090',name:'Cable Rear Delt Fly',group:'Rear Delts'},
+  // Forearms
+  {id:'e091',name:'Wrist Curl',group:'Forearms'},
+  {id:'e092',name:'Reverse Curl',group:'Forearms'},
+  {id:'e093',name:'Hammer Curl',group:'Forearms'},
+  // Quads
+  {id:'e094',name:'Leg Extension',group:'Quads'},
+  {id:'e095',name:'Sissy Squat',group:'Quads'},
+  {id:'e096',name:'Wall Sit',group:'Quads'},
+  // Hamstrings
+  {id:'e097',name:'Lying Leg Curl',group:'Hamstrings'},
+  {id:'e098',name:'Nordic Hamstring Curl',group:'Hamstrings'},
+  {id:'e099',name:'Seated Leg Curl',group:'Hamstrings'},
+  // Glutes
+  {id:'e100',name:'Glute Bridge',group:'Glutes'},
+  {id:'e101',name:'Cable Kickback',group:'Glutes'},
+  {id:'e102',name:'Hip Abduction Machine',group:'Glutes'},
+  // Adductors
+  {id:'e103',name:'Machine Adductor',group:'Adductors'},
+  {id:'e104',name:'Sumo Squat',group:'Adductors'},
+  {id:'e105',name:'Cable Adduction',group:'Adductors'},
+  // Abductors
+  {id:'e106',name:'Machine Abductor',group:'Abductors'},
+  {id:'e107',name:'Side-lying Leg Raise',group:'Abductors'},
+  {id:'e108',name:'Cable Abduction',group:'Abductors'},
+  // Calves
+  {id:'e109',name:'Donkey Calf Raise',group:'Calves'},
+  {id:'e110',name:'Leg Press Calf Raise',group:'Calves'},
+  {id:'e111',name:'Single-leg Calf Raise',group:'Calves'},
+  // Abs
+  {id:'e112',name:'Sit-up',group:'Abs'},
+  {id:'e113',name:'Dragon Flag',group:'Abs'},
+  {id:'e114',name:'Leg Raise',group:'Abs'},
+  {id:'e115',name:'V-up',group:'Abs'},
+  // Obliques
+  {id:'e116',name:'Side Plank',group:'Obliques'},
+  {id:'e117',name:'Pallof Press',group:'Obliques'},
+  {id:'e118',name:'Cable Woodchopper',group:'Obliques'},
+  {id:'e119',name:'Dumbbell Side Bend',group:'Obliques'},
 ];
 
 /* ═══════════════════════════════════════════════════════════
@@ -2139,7 +2223,14 @@ function deleteSplit(splitId) {
 }
 
 /* ── Muscle Model ───────────────────────────────────────── */
-const MUSCLE_GROUPS = ['Chest','Back','Shoulders','Biceps','Triceps','Core','Legs'];
+const MUSCLE_GROUPS = [
+  'Chest','Upper Chest',
+  'Lats','Traps','Lower Back','Back',
+  'Front Delts','Side Delts','Rear Delts','Shoulders',
+  'Biceps','Triceps','Forearms',
+  'Abs','Obliques','Core',
+  'Quads','Hamstrings','Glutes','Adductors','Abductors','Calves','Legs',
+];
 
 // Returns { counts, green, yellow } based on the selected analytics range.
 // Thresholds scale linearly with days: 2 sessions/week = green, 1 = yellow, 0 = red.

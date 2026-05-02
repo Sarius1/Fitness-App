@@ -15,20 +15,37 @@ import sys
 
 # ── PATHS ──────────────────────────────────────────────────────────────────────
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-INPUT  = os.path.join(SCRIPT_DIR, "male_base_mesh_with_muscle_detail.glb")
+INPUT  = os.path.join(SCRIPT_DIR, "male_body_muscular_system_-_anatomy_study.glb")
 OUTPUT = os.path.join(SCRIPT_DIR, "male_muscles_named.glb")
 
 # ── MUSCLE GROUPS (name, default_color) ───────────────────────────────────────
 # Colors are just defaults — FitTrack app overrides them at runtime
+# Broad groups (backwards-compat — keep existing assignments)
 GROUPS = [
-    ("Chest",     (0.85, 0.25, 0.25)),   # red
-    ("Back",      (0.25, 0.45, 0.85)),   # blue
-    ("Shoulders", (0.85, 0.55, 0.15)),   # orange
-    ("Biceps",    (0.25, 0.75, 0.45)),   # green
-    ("Triceps",   (0.65, 0.25, 0.85)),   # purple
-    ("Core",      (0.90, 0.80, 0.15)),   # yellow
-    ("Legs",      (0.85, 0.35, 0.55)),   # pink
-    ("Other",     (0.55, 0.55, 0.55)),   # grey (neck, hands, feet)
+    ("Chest",       (0.85, 0.25, 0.25)),   # red
+    ("Upper Chest", (1.00, 0.60, 0.60)),   # light red
+    ("Back",        (0.25, 0.45, 0.85)),   # blue
+    ("Lats",        (0.13, 0.83, 0.93)),   # cyan
+    ("Traps",       (0.02, 0.71, 0.77)),   # teal
+    ("Lower Back",  (0.03, 0.55, 0.70)),   # dark teal
+    ("Shoulders",   (0.85, 0.55, 0.15)),   # orange
+    ("Front Delts", (0.98, 0.57, 0.24)),   # light orange
+    ("Side Delts",  (0.98, 0.45, 0.09)),   # orange
+    ("Rear Delts",  (0.92, 0.35, 0.02)),   # dark orange
+    ("Biceps",      (0.25, 0.75, 0.45)),   # green
+    ("Triceps",     (0.65, 0.25, 0.85)),   # purple
+    ("Forearms",    (0.64, 0.89, 0.21)),   # yellow-green
+    ("Core",        (0.90, 0.80, 0.15)),   # yellow
+    ("Abs",         (0.98, 0.80, 0.08)),   # gold
+    ("Obliques",    (0.79, 0.54, 0.02)),   # dark gold
+    ("Legs",        (0.85, 0.35, 0.55)),   # pink
+    ("Quads",       (0.91, 0.47, 0.98)),   # violet-pink
+    ("Hamstrings",  (0.75, 0.15, 0.82)),   # purple-pink
+    ("Glutes",      (0.86, 0.15, 0.47)),   # magenta-pink
+    ("Adductors",   (0.96, 0.25, 0.36)),   # red-pink
+    ("Abductors",   (0.98, 0.44, 0.54)),   # salmon
+    ("Calves",      (0.18, 0.83, 0.75)),   # mint
+    ("Other",       (0.55, 0.55, 0.55)),   # grey (neck, hands, feet)
 ]
 
 # ── REGION DEFINITIONS ────────────────────────────────────────────────────────
@@ -116,16 +133,40 @@ def main():
     log(f"Importing: {INPUT}")
     bpy.ops.import_scene.gltf(filepath=INPUT)
 
+    # Delete cameras, lights, empties — keep only meshes
+    for o in list(bpy.context.scene.objects):
+        if o.type != 'MESH':
+            bpy.data.objects.remove(o, do_unlink=True)
+
     meshes = [o for o in bpy.context.scene.objects if o.type == 'MESH']
     if not meshes:
         log("ERROR: No mesh found after import!")
         sys.exit(1)
 
-    obj = meshes[0]
-    log(f"Mesh: '{obj.name}'  |  {len(obj.data.vertices):,} verts  |  {len(obj.data.polygons):,} faces")
+    # Clear parents and apply all transforms on each mesh individually
+    bpy.ops.object.select_all(action='DESELECT')
+    for m in meshes:
+        m.select_set(True)
+    bpy.ops.object.parent_clear(type='CLEAR_KEEP_TRANSFORM')
+    for m in meshes:
+        bpy.ops.object.select_all(action='DESELECT')
+        m.select_set(True)
+        bpy.context.view_layer.objects.active = m
+        bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
 
-    # 3 ── Detect coordinate axes
-    up, depth, lateral, mins, maxs = detect_axes(obj)
+    # 3 ── Join all meshes into one
+    meshes = [o for o in bpy.context.scene.objects if o.type == 'MESH']
+    log(f"Found {len(meshes)} mesh(es) — joining ...")
+    bpy.ops.object.select_all(action='DESELECT')
+    for m in meshes:
+        m.select_set(True)
+    bpy.context.view_layer.objects.active = meshes[0]
+    bpy.ops.object.join()
+    obj = bpy.context.view_layer.objects.active
+    import math
+    obj.rotation_euler = (-math.pi / 2, 0, 0)
+    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    log(f"Joined mesh: '{obj.name}'  |  {len(obj.data.vertices):,} verts  |  {len(obj.data.polygons):,} faces")
 
     # 4 ── Create named materials
     log("Creating materials ...")
@@ -148,43 +189,26 @@ def main():
         mat_idx[name] = len(obj.data.materials) - 1
         log(f"  [{mat_idx[name]:2d}] {name}")
 
-    # 5 ── Assign faces
-    log("Assigning faces ...")
+    # 5 ── Assign faces: all to Other, but 1 face per group to keep all materials in export
+    log("Assigning all faces to Other (1 placeholder face per group) ...")
     bpy.context.view_layer.objects.active = obj
     bpy.ops.object.mode_set(mode='EDIT')
 
     bm = bmesh.from_edit_mesh(obj.data)
     bm.faces.ensure_lookup_table()
 
-    counts = {name: 0 for name, _ in GROUPS}
-    mat3   = obj.matrix_world.to_3x3()
+    total_faces = len(bm.faces)
+    group_names = [name for name, _ in GROUPS if name != 'Other']
 
-    for face in bm.faces:
-        c = obj.matrix_world @ face.calc_center_median()
-        n = (mat3 @ face.normal).normalized()
-        coords  = [c.x, c.y, c.z]
-        normals = [n.x, n.y, n.z]
-
-        pu = norm(coords[up],      mins[up],      maxs[up])
-        pd = norm(coords[depth],   mins[depth],   maxs[depth])
-        pl = norm(coords[lateral], mins[lateral], maxs[lateral])
-        nu = normals[up]
-        nd = normals[depth]
-        nl = normals[lateral]
-
-        group = classify(pu, pd, pl, nu, nd, nl)
-        face.material_index = mat_idx[group]
-        counts[group] += 1
+    for i, face in enumerate(bm.faces):
+        if i < len(group_names):
+            face.material_index = mat_idx[group_names[i]]
+        else:
+            face.material_index = mat_idx['Other']
 
     bmesh.update_edit_mesh(obj.data)
     bpy.ops.object.mode_set(mode='OBJECT')
-
-    # 6 ── Report
-    total = sum(counts.values())
-    log("Face assignment:")
-    for name, c in counts.items():
-        bar = "█" * int(30 * c / total) if total else ""
-        log(f"  {name:12s} {c:6,} ({100*c/total:5.1f}%)  {bar}")
+    log(f"  {total_faces:,} faces assigned — all groups present in export")
 
     # 7 ── Export
     log(f"Exporting to: {OUTPUT}")
