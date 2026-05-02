@@ -38,144 +38,9 @@ const GROUP_COLORS = {
 };
 const PLAN_COLORS = ['#8b5cf6','#3b82f6','#22c55e','#f59e0b','#ef4444','#ec4899','#14b8a6','#f97316'];
 const EXERCISE_DB = [
-  {id:'e001',name:'Barbell Bench Press',group:'Chest'},
-  {id:'e002',name:'Incline Barbell Press',group:'Chest'},
-  {id:'e003',name:'Decline Barbell Press',group:'Chest'},
-  {id:'e004',name:'Dumbbell Bench Press',group:'Chest'},
-  {id:'e005',name:'Incline Dumbbell Press',group:'Chest'},
-  {id:'e006',name:'Dumbbell Fly',group:'Chest'},
-  {id:'e007',name:'Cable Crossover',group:'Chest'},
-  {id:'e008',name:'Push-ups',group:'Chest'},
-  {id:'e009',name:'Chest Dips',group:'Chest'},
-  {id:'e010',name:'Pec Deck',group:'Chest'},
-  {id:'e011',name:'Conventional Deadlift',group:'Back'},
-  {id:'e012',name:'Pull-ups',group:'Back'},
-  {id:'e013',name:'Chin-ups',group:'Back'},
-  {id:'e014',name:'Barbell Bent-over Row',group:'Back'},
-  {id:'e015',name:'Dumbbell Row',group:'Back'},
-  {id:'e016',name:'Lat Pulldown',group:'Back'},
-  {id:'e017',name:'Seated Cable Row',group:'Back'},
-  {id:'e018',name:'T-bar Row',group:'Back'},
-  {id:'e019',name:'Face Pull',group:'Back'},
-  {id:'e020',name:'Straight-arm Pulldown',group:'Back'},
-  {id:'e021',name:'Barbell Overhead Press',group:'Shoulders'},
-  {id:'e022',name:'Dumbbell Shoulder Press',group:'Shoulders'},
-  {id:'e023',name:'Arnold Press',group:'Shoulders'},
-  {id:'e024',name:'Lateral Raise',group:'Shoulders'},
-  {id:'e025',name:'Front Raise',group:'Shoulders'},
-  {id:'e026',name:'Rear Delt Fly',group:'Shoulders'},
-  {id:'e027',name:'Upright Row',group:'Shoulders'},
-  {id:'e028',name:'Cable Lateral Raise',group:'Shoulders'},
-  {id:'e029',name:'Barbell Curl',group:'Biceps'},
-  {id:'e030',name:'Dumbbell Curl',group:'Biceps'},
-  {id:'e031',name:'Hammer Curl',group:'Biceps'},
-  {id:'e032',name:'Incline Dumbbell Curl',group:'Biceps'},
-  {id:'e033',name:'Cable Curl',group:'Biceps'},
-  {id:'e034',name:'Preacher Curl',group:'Biceps'},
-  {id:'e035',name:'Concentration Curl',group:'Biceps'},
-  {id:'e036',name:'EZ Bar Curl',group:'Biceps'},
-  {id:'e037',name:'Close-grip Bench Press',group:'Triceps'},
-  {id:'e038',name:'Skullcrusher',group:'Triceps'},
-  {id:'e039',name:'Tricep Pushdown',group:'Triceps'},
-  {id:'e040',name:'Rope Pushdown',group:'Triceps'},
-  {id:'e041',name:'Overhead Tricep Extension',group:'Triceps'},
-  {id:'e042',name:'Tricep Dips',group:'Triceps'},
-  {id:'e043',name:'Diamond Push-ups',group:'Triceps'},
-  {id:'e044',name:'Back Squat',group:'Legs'},
-  {id:'e045',name:'Front Squat',group:'Legs'},
-  {id:'e046',name:'Leg Press',group:'Legs'},
-  {id:'e047',name:'Romanian Deadlift',group:'Legs'},
-  {id:'e048',name:'Leg Curl',group:'Legs'},
-  {id:'e049',name:'Leg Extension',group:'Legs'},
-  {id:'e050',name:'Standing Calf Raise',group:'Legs'},
-  {id:'e051',name:'Seated Calf Raise',group:'Legs'},
-  {id:'e052',name:'Walking Lunge',group:'Legs'},
-  {id:'e053',name:'Bulgarian Split Squat',group:'Legs'},
-  {id:'e054',name:'Hack Squat',group:'Legs'},
-  {id:'e055',name:'Hip Thrust',group:'Legs'},
-  {id:'e056',name:'Goblet Squat',group:'Legs'},
-  {id:'e057',name:'Plank',group:'Core'},
-  {id:'e058',name:'Crunches',group:'Core'},
-  {id:'e059',name:'Hanging Leg Raises',group:'Core'},
-  {id:'e060',name:'Russian Twist',group:'Core'},
-  {id:'e061',name:'Cable Crunch',group:'Core'},
-  {id:'e062',name:'Ab Wheel Rollout',group:'Core'},
-  {id:'e063',name:'Bicycle Crunch',group:'Core'},
-  {id:'e064',name:'Clean and Press',group:'Full Body'},
-  {id:'e065',name:'Kettlebell Swing',group:'Full Body'},
-  {id:'e066',name:'Burpees',group:'Full Body'},
-  {id:'e067',name:'Box Jump',group:'Full Body'},
-  {id:'e068',name:"Farmer's Walk",group:'Full Body'},
-  {id:'e069',name:'Thruster',group:'Full Body'},
-  {id:'r001',name:'Run',group:'Runs'},
-  {id:'r002',name:'Intervall Run',group:'Runs'},
-  {id:'r003',name:'Tempo Run',group:'Runs'},
-  // Upper Chest
-  {id:'e070',name:'High Cable Fly',group:'Upper Chest'},
-  {id:'e071',name:'Incline Cable Press',group:'Upper Chest'},
-  {id:'e072',name:'Incline Smith Press',group:'Upper Chest'},
-  // Lats
-  {id:'e073',name:'Wide-grip Pull-up',group:'Lats'},
-  {id:'e074',name:'Close-grip Lat Pulldown',group:'Lats'},
-  {id:'e075',name:'Single-arm Cable Row',group:'Lats'},
-  // Traps
-  {id:'e076',name:'Barbell Shrug',group:'Traps'},
-  {id:'e077',name:'Dumbbell Shrug',group:'Traps'},
-  {id:'e078',name:'Rack Pull',group:'Traps'},
-  // Lower Back
-  {id:'e079',name:'Back Extension',group:'Lower Back'},
-  {id:'e080',name:'Good Morning',group:'Lower Back'},
-  {id:'e081',name:'Hyperextension',group:'Lower Back'},
-  // Front Delts
-  {id:'e082',name:'Barbell Front Raise',group:'Front Delts'},
-  {id:'e083',name:'Dumbbell Front Raise',group:'Front Delts'},
-  {id:'e084',name:'Cable Front Raise',group:'Front Delts'},
-  // Side Delts
-  {id:'e085',name:'Dumbbell Lateral Raise',group:'Side Delts'},
-  {id:'e086',name:'Machine Lateral Raise',group:'Side Delts'},
-  {id:'e087',name:'Cable Lateral Raise',group:'Side Delts'},
-  // Rear Delts
-  {id:'e088',name:'Reverse Pec Deck',group:'Rear Delts'},
-  {id:'e089',name:'Band Pull-apart',group:'Rear Delts'},
-  {id:'e090',name:'Cable Rear Delt Fly',group:'Rear Delts'},
-  // Forearms
-  {id:'e091',name:'Wrist Curl',group:'Forearms'},
-  {id:'e092',name:'Reverse Curl',group:'Forearms'},
-  {id:'e093',name:'Hammer Curl',group:'Forearms'},
-  // Quads
-  {id:'e094',name:'Leg Extension',group:'Quads'},
-  {id:'e095',name:'Sissy Squat',group:'Quads'},
-  {id:'e096',name:'Wall Sit',group:'Quads'},
-  // Hamstrings
-  {id:'e097',name:'Lying Leg Curl',group:'Hamstrings'},
-  {id:'e098',name:'Nordic Hamstring Curl',group:'Hamstrings'},
-  {id:'e099',name:'Seated Leg Curl',group:'Hamstrings'},
-  // Glutes
-  {id:'e100',name:'Glute Bridge',group:'Glutes'},
-  {id:'e101',name:'Cable Kickback',group:'Glutes'},
-  {id:'e102',name:'Hip Abduction Machine',group:'Glutes'},
-  // Adductors
-  {id:'e103',name:'Machine Adductor',group:'Adductors'},
-  {id:'e104',name:'Sumo Squat',group:'Adductors'},
-  {id:'e105',name:'Cable Adduction',group:'Adductors'},
-  // Abductors
-  {id:'e106',name:'Machine Abductor',group:'Abductors'},
-  {id:'e107',name:'Side-lying Leg Raise',group:'Abductors'},
-  {id:'e108',name:'Cable Abduction',group:'Abductors'},
-  // Calves
-  {id:'e109',name:'Donkey Calf Raise',group:'Calves'},
-  {id:'e110',name:'Leg Press Calf Raise',group:'Calves'},
-  {id:'e111',name:'Single-leg Calf Raise',group:'Calves'},
-  // Abs
-  {id:'e112',name:'Sit-up',group:'Abs'},
-  {id:'e113',name:'Dragon Flag',group:'Abs'},
-  {id:'e114',name:'Leg Raise',group:'Abs'},
-  {id:'e115',name:'V-up',group:'Abs'},
-  // Obliques
-  {id:'e116',name:'Side Plank',group:'Obliques'},
-  {id:'e117',name:'Pallof Press',group:'Obliques'},
-  {id:'e118',name:'Cable Woodchopper',group:'Obliques'},
-  {id:'e119',name:'Dumbbell Side Bend',group:'Obliques'},
+  {id:'r001',name:'Run',group:'Runs',groups:['Runs']},
+  {id:'r002',name:'Intervall Run',group:'Runs',groups:['Runs']},
+  {id:'r003',name:'Tempo Run',group:'Runs',groups:['Runs']},
 ];
 
 /* ═══════════════════════════════════════════════════════════
@@ -1110,7 +975,14 @@ const getHistory      = () => load(SK.HISTORY,       []);
 const getRuns         = () => load(SK.RUNS,           []);
 const getSplits       = () => load(SK.SPLITS,         []);
 const getActiveSplit  = () => load(SK.ACTIVE_SPLIT,   null);
-const getAllExercises  = () => [...EXERCISE_DB, ...load(SK.CUSTOM_EX, [])];
+const getAllExercises  = () => {
+  const custom = load(SK.CUSTOM_EX, []).map(e => ({
+    ...e,
+    group: Array.isArray(e.groups) ? e.groups[0] : (e.group || 'Custom'),
+    groups: e.groups || (e.group ? [e.group] : ['Custom']),
+  }));
+  return [...EXERCISE_DB, ...custom];
+};
 const getRepeatMeals  = () => load(SK.REPEAT_MEALS,   []);
 const getSupplements  = () => load(SK.SUPPLEMENTS,    []);
 const getSupplLog     = () => load(SK.SUPPL_LOG,      {});
@@ -1351,9 +1223,15 @@ function renderExPicker(planId, mode) {
     const sel = state.pickerSelected.includes(e.id);
     const col = GROUP_COLORS[e.group] || '#888';
     const abbr = e.group.substring(0,2).toUpperCase();
+    const isCustom = e.id?.startsWith('c_');
+    const groupLabel = Array.isArray(e.groups) && e.groups.length > 1 ? e.groups.join(', ') : esc(e.group);
+    const editBtn = isCustom
+      ? `<button class="icon-btn" style="color:var(--text3);padding:4px;flex-shrink:0" onclick="event.stopPropagation();openCustomEx('${planId}','${mode}','${e.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>`
+      : '';
     return `<div class="ex-row${sel?' selected':''}" data-exid="${e.id}" onclick="toggleEx('${e.id}','${planId}','${mode}')">
       <div class="ex-badge" style="background:${col}">${abbr}</div>
-      <div style="flex:1"><div class="ex-row-name">${esc(e.name)}</div><div class="ex-row-group">${esc(e.group)}</div></div>
+      <div style="flex:1;min-width:0"><div class="ex-row-name">${esc(e.name)}</div><div class="ex-row-group" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${groupLabel}</div></div>
+      ${editBtn}
       <div class="ex-check">${sel?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" width="12" height="12"><polyline points="20 6 9 17 4 12"/></svg>':''}</div>
     </div>`;
   }).join('');
@@ -1394,25 +1272,89 @@ function toggleEx(id, planId, mode) {
   if (title) title.textContent = `${state.pickerSelected.length} selected`;
 }
 
-function openCustomEx(planId, mode) {
+function openCustomEx(planId, mode, editId) {
+  const existing = editId ? load(SK.CUSTOM_EX,[]).find(e => e.id === editId) : null;
+  const selGroups = existing?.groups || [];
+  const groupChips = MUSCLE_GROUPS.map(g => {
+    const col = GROUP_COLORS[g] || '#888';
+    const active = selGroups.includes(g);
+    return `<button type="button" data-g="${g}" data-active="${active?'1':'0'}" onclick="toggleCustomExGroup(this,'${g}')"
+      style="padding:4px 10px;border-radius:8px;border:2px solid ${active?col:'var(--border)'};background:${active?col+'22':'transparent'};color:${active?col:'var(--text2)'};font-size:12px;font-weight:600;cursor:pointer">${g}</button>`;
+  }).join('');
+  const imgPreview = existing?.imageData
+    ? `<img src="${existing.imageData}" style="width:100%;max-height:140px;object-fit:cover;border-radius:10px;margin-bottom:6px">`
+    : '';
   openOverlay(`
-    <div class="input-group"><label class="input-label">${t('ex_name')}</label><input class="input" id="ce_name" type="text" placeholder="e.g. Cable Fly"></div>
-    <div class="input-group">
-      <label class="input-label">${t('muscle_group')}</label>
-      <select class="input" id="ce_group">
-        ${Object.keys(GROUP_COLORS).map(g=>`<option value="${g}">${g}</option>`).join('')}
-      </select>
-    </div>
-    <button class="btn btn-primary btn-full mt-8" onclick="saveCustomEx('${planId}','${mode}')">Add</button>`, 'Custom Exercise');
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="input-group">
+        <label class="input-label">${t('ex_name')}</label>
+        <input class="input" id="ce_name" type="text" placeholder="z.B. Schrägbankdrücken" value="${esc(existing?.name||'')}">
+      </div>
+      <div class="input-group">
+        <label class="input-label">${t('muscle_group')}</label>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px" id="ce_groups">${groupChips}</div>
+      </div>
+      <div class="input-group">
+        <label class="input-label">Bild (optional)</label>
+        ${imgPreview}
+        <input type="file" accept="image/*" id="ce_image" style="font-size:13px" onchange="previewCustomExImage(this)">
+        <img id="ce_img_preview" style="display:none;width:100%;max-height:140px;object-fit:cover;border-radius:10px;margin-top:6px">
+      </div>
+      <button class="btn btn-primary btn-full" onclick="saveCustomEx('${planId}','${mode}','${editId||''}')">${existing?t('save_changes'):'Übung hinzufügen'}</button>
+    </div>`, t('custom_ex_title'));
 }
-function saveCustomEx(planId, mode) {
+
+function previewCustomExImage(input) {
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = document.getElementById('ce_img_preview');
+    if (img) { img.src = e.target.result; img.style.display = 'block'; }
+  };
+  reader.readAsDataURL(file);
+}
+
+function toggleCustomExGroup(btn, group) {
+  const col = GROUP_COLORS[group] || '#888';
+  const isActive = btn.getAttribute('data-active') === '1';
+  if (isActive) {
+    btn.setAttribute('data-active', '0');
+    btn.style.borderColor = 'var(--border)';
+    btn.style.background = 'transparent';
+    btn.style.color = 'var(--text2)';
+  } else {
+    btn.setAttribute('data-active', '1');
+    btn.style.borderColor = col;
+    btn.style.background = col + '22';
+    btn.style.color = col;
+  }
+}
+
+function saveCustomEx(planId, mode, editId) {
   const name = document.getElementById('ce_name')?.value.trim();
-  if (!name) { showToast('Enter a name'); return; }
-  const ex = { id:'c_'+uid(), name, group: document.getElementById('ce_group')?.value||'Custom' };
-  const custom = load(SK.CUSTOM_EX,[]);
-  custom.push(ex); save(SK.CUSTOM_EX, custom);
-  state.pickerSelected.push(ex.id);
-  closeOverlay(); renderExPicker(planId, mode); showToast('Added!');
+  if (!name) { showToast(t('enter_name')); return; }
+  const groups = [...document.querySelectorAll('#ce_groups button[data-active="1"]')]
+    .map(b => b.dataset.g).filter(Boolean);
+  if (!groups.length) { showToast('Mindestens 1 Muskelgruppe wählen'); return; }
+  const previewImg = document.getElementById('ce_img_preview');
+  const imageData = (previewImg?.style.display !== 'none' && previewImg?.src?.startsWith('data:'))
+    ? previewImg.src : null;
+  const custom = load(SK.CUSTOM_EX, []);
+  if (editId) {
+    const idx = custom.findIndex(e => e.id === editId);
+    if (idx >= 0) {
+      custom[idx] = { ...custom[idx], name, groups, group: groups[0],
+        imageData: imageData !== null ? imageData : custom[idx].imageData };
+    }
+  } else {
+    const ex = { id:'c_'+uid(), name, groups, group: groups[0], imageData };
+    custom.push(ex);
+    state.pickerSelected.push(ex.id);
+  }
+  save(SK.CUSTOM_EX, custom);
+  closeOverlay();
+  renderExPicker(planId, mode);
+  showToast(editId ? t('save') + ' ✓' : 'Übung hinzugefügt!');
 }
 
 /* ── Active Workout ─────────────────────────────────────── */
@@ -1460,11 +1402,14 @@ function startWorkout(planId, lockerNum) {
     exercises:(plan.exercises||[]).map(ex => {
       const lastArr = getLastSetsArray(ex.id);
       const fallback = { weight:'', reps:'' };
+      const customEx = load('ft_custom_ex',[]).find(e => e.id === ex.id);
       return {
         exerciseId:ex.id, name:ex.name, group:ex.group||'',
+        groups: ex.groups || (ex.group ? [ex.group] : []),
         plannedSets:ex.sets||3, plannedReps:ex.reps||'8-12',
         seatPos: ex.seatPos || null,
         chestSupport: ex.chestSupport || null,
+        imageData: customEx?.imageData || null,
         sets:Array.from({length:ex.sets||3}, (_,si) => {
           const prev = lastArr?.[si] || lastArr?.[lastArr.length-1] || fallback;
           return { weight:prev.weight, reps:prev.reps, done:false };
@@ -1512,12 +1457,13 @@ function renderWorkoutSession() {
           ${ex.chestSupport != null ? `<span style="font-size:11px;color:var(--text2);background:var(--card2);padding:2px 8px;border-radius:8px">${esc(ml.l2)}: <b>${esc(ex.chestSupport)}</b></span>` : ''}
         </div>` : '';
     const isRunEx = ex.group === 'Runs';
+    const exImage = ex.imageData ? `<img src="${ex.imageData}" style="width:100%;max-height:160px;object-fit:cover;border-radius:10px;margin-bottom:8px">` : '';
     const cardBody = isRunEx
       ? `<div style="padding:8px 0">
           ${ex.seatPos ? `<div style="font-size:13px;color:var(--text2);margin-bottom:8px">Ziel: <b>${esc(ex.seatPos)} km</b></div>` : ''}
           <button class="btn btn-primary btn-sm" onclick="closePanel();switchWorkoutSub('running');openAddRun()">🏃 Run jetzt loggen</button>
         </div>`
-      : `${machineInfo}<div class="workout-sets">${setsHtml}<button class="add-set-btn" onclick="addSet(${ei})">${t('add_set')}</button></div>`;
+      : `${exImage}${machineInfo}<div class="workout-sets">${setsHtml}<button class="add-set-btn" onclick="addSet(${ei})">${t('add_set')}</button></div>`;
     return `<div class="workout-ex-card">
       <div class="workout-ex-header">
         <div class="ex-badge" style="background:${col};width:32px;height:32px;border-radius:8px;font-size:10px">${abbr}</div>
@@ -2257,7 +2203,10 @@ function getMuscleTrainingStatus() {
   const sessionDates = {};
   hist.forEach(wo => {
     if (wo.date < cutoffStr) return;
-    const groups = new Set((wo.exercises||[]).map(e => e.group).filter(Boolean));
+    const groups = new Set((wo.exercises||[]).flatMap(e => {
+      const gs = Array.isArray(e.groups) ? e.groups : (e.group ? [e.group] : []);
+      return gs.filter(Boolean);
+    }));
     groups.forEach(g => { if (!sessionDates[g]) sessionDates[g] = new Set(); sessionDates[g].add(wo.date); });
   });
   const counts = {};
