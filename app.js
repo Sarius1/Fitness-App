@@ -213,7 +213,7 @@ const TR = {
     step_goal:'Schrittziel', reminders:'Erinnerungen', no_reminders:'Keine Erinnerungen',
     add_reminder:'+ Erinnerung hinzufügen', reminder_title:'Erinnerung hinzufügen',
     reminder_text:'Text', reminder_time:'Uhrzeit', reminder_saved:'Erinnerung gespeichert!',
-    language:'Sprache', weight_logged:'kg gespeichert!', steps_saved:'Schritte gespeichert!',
+    language:'Sprache', track_macros:'Makros tracken', weight_logged:'kg gespeichert!', steps_saved:'Schritte gespeichert!',
     food_saved:'Essen gespeichert!', enter_name:'Name eingeben',
     edit_food_title:'Gericht bearbeiten', activity_set:'Aktivität gesetzt!', reset_done:'Zurückgesetzt',
     splits_tab:'Splits', plans_tab:'Pläne', history_tab:'Verlauf', running_tab:'Laufen',
@@ -266,7 +266,7 @@ const TR = {
     step_goal:'Step Goal', reminders:'Reminders', no_reminders:'No reminders',
     add_reminder:'+ Add Reminder', reminder_title:'Add Reminder',
     reminder_text:'Text', reminder_time:'Time', reminder_saved:'Reminder saved!',
-    language:'Language', weight_logged:'kg logged!', steps_saved:'Steps saved!',
+    language:'Language', track_macros:'Track Macros', weight_logged:'kg logged!', steps_saved:'Steps saved!',
     food_saved:'Food saved!', enter_name:'Enter name',
     edit_food_title:'Edit Food', activity_set:'Activity set!', reset_done:'Reset to split',
     splits_tab:'Splits', plans_tab:'Plans', history_tab:'History', running_tab:'Running',
@@ -517,16 +517,18 @@ function openDayView(dateStr) {
       </div>`
     : `<button class="btn btn-secondary btn-full" style="margin-bottom:10px" onclick="openActivityOverride('${dateStr}')">+ Add Activity for this day</button>`;
 
-  const macroBoxes = ['calories','protein','carbs','fat'].map(k => {
+  const tracked = getTrackedMacros();
+  const macroLabels = {calories:t('calories'),protein:t('protein'),carbs:t('carbs'),fat:t('fat')};
+  const macroBoxes = tracked.map(k => {
     const unit = k === 'calories' ? 'kcal' : 'g';
     return `<div class="macro-box">
       <div class="macro-val">${tot[k]}</div>
       <div class="macro-unit">${unit}</div>
-      <div class="macro-lbl">${k.charAt(0).toUpperCase()+k.slice(1)}</div>
+      <div class="macro-lbl">${macroLabels[k]}</div>
     </div>`;
   }).join('');
 
-  const bars = ['calories','protein','carbs','fat'].map(k => {
+  const bars = tracked.map(k => {
     const unit = k === 'calories' ? 'kcal' : 'g';
     const rawPct = goals[k] > 0 ? (tot[k]/goals[k])*100 : 0;
     const barPct = Math.min(rawPct, 120);
@@ -534,7 +536,7 @@ function openDayView(dateStr) {
     const cls = barColor(rawPct);
     return `<div class="prog-bar-wrap">
       <div class="prog-bar-top">
-        <span class="prog-bar-label">${k.charAt(0).toUpperCase()+k.slice(1)}</span>
+        <span class="prog-bar-label">${macroLabels[k]}</span>
         <span class="prog-bar-val">${tot[k]}${unit} / ${goals[k]}${unit} (${dispPct}%)</span>
       </div>
       <div class="prog-bar-track"><div class="prog-bar-fill ${cls}" style="width:${barPct}%"></div></div>
@@ -545,9 +547,9 @@ function openDayView(dateStr) {
     ? foods.map(f => `<div class="food-item">
         <div class="food-info" style="flex:1;min-width:0">
           <div class="food-name">${esc(f.name)}</div>
-          <div class="food-macros">P ${f.protein}g · C ${f.carbs}g · F ${f.fat}g</div>
+          <div class="food-macros">${[tracked.includes('protein')?`P ${f.protein}g`:'', tracked.includes('carbs')?`C ${f.carbs}g`:'', tracked.includes('fat')?`F ${f.fat}g`:''].filter(Boolean).join(' · ')}</div>
         </div>
-        <span class="food-cal">${f.calories} kcal</span>
+        ${tracked.includes('calories')?`<span class="food-cal">${f.calories} kcal</span>`:''}
         <button class="icon-btn" style="color:var(--text2);padding:4px" onclick="openEditFoodModal('${dateStr}','${f.id}')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         </button>
@@ -622,27 +624,13 @@ function openAddFoodModal(dateStr) {
         <label class="input-label">${t('food_name')}</label>
         <input class="input" id="fn_name" type="text" placeholder="z.B. Haferflocken mit Milch">
       </div>
-      <div class="input-row">
-        <div class="input-group">
-          <label class="input-label">${t('calories')}</label>
-          <input class="input" id="fn_cal" type="number" inputmode="decimal" placeholder="0">
-        </div>
-        <div class="input-group">
-          <label class="input-label">${t('protein')} (g)</label>
-          <input class="input" id="fn_pro" type="number" inputmode="decimal" placeholder="0">
-        </div>
-      </div>
-      <div class="input-row">
-        <div class="input-group">
-          <label class="input-label">${t('carbs')} (g)</label>
-          <input class="input" id="fn_carb" type="number" inputmode="decimal" placeholder="0">
-        </div>
-        <div class="input-group">
-          <label class="input-label">${t('fat')} (g)</label>
-          <input class="input" id="fn_fat" type="number" inputmode="decimal" placeholder="0">
-        </div>
-      </div>
-      <button class="btn btn-primary btn-full mt-8" onclick="submitFood('${dateStr}')">Hinzufügen</button>
+      ${(()=>{const tr=getTrackedMacros();const fields=[
+        tr.includes('calories')?`<div class="input-group"><label class="input-label">${t('calories')}</label><input class="input" id="fn_cal" type="number" inputmode="decimal" placeholder="0"></div>`:'',
+        tr.includes('protein')?`<div class="input-group"><label class="input-label">${t('protein')} (g)</label><input class="input" id="fn_pro" type="number" inputmode="decimal" placeholder="0"></div>`:'',
+        tr.includes('carbs')?`<div class="input-group"><label class="input-label">${t('carbs')} (g)</label><input class="input" id="fn_carb" type="number" inputmode="decimal" placeholder="0"></div>`:'',
+        tr.includes('fat')?`<div class="input-group"><label class="input-label">${t('fat')} (g)</label><input class="input" id="fn_fat" type="number" inputmode="decimal" placeholder="0"></div>`:'',
+      ].filter(Boolean);let html='';for(let i=0;i<fields.length;i+=2){html+=`<div class="input-row">${fields[i]}${fields[i+1]||''}</div>`;}return html;})()}
+      <button class="btn btn-primary btn-full mt-8" onclick="submitFood('${dateStr}')">${t('add')}</button>
     </div>
     <div id="food_tab_saved" style="display:none">
       ${savedMealsHtml}
@@ -830,16 +818,14 @@ function openEditFoodModal(dateStr, foodId) {
   if (!f) return;
   openOverlay(`
     <div style="display:flex;flex-direction:column;gap:10px">
-      <div class="input-group"><label class="input-label">Name</label><input class="input" id="ef_name" type="text" value="${esc(f.name)}"></div>
-      <div class="input-row">
-        <div class="input-group"><label class="input-label">${t('calories')}</label><input class="input" id="ef_cal" type="number" inputmode="decimal" value="${f.calories}"></div>
-        <div class="input-group"><label class="input-label">Protein (g)</label><input class="input" id="ef_pro" type="number" inputmode="decimal" value="${f.protein}"></div>
-      </div>
-      <div class="input-row">
-        <div class="input-group"><label class="input-label">${t('carbs')} (g)</label><input class="input" id="ef_carb" type="number" inputmode="decimal" value="${f.carbs}"></div>
-        <div class="input-group"><label class="input-label">${t('fat')} (g)</label><input class="input" id="ef_fat" type="number" inputmode="decimal" value="${f.fat}"></div>
-      </div>
-      <button class="btn btn-primary btn-full" onclick="saveEditFood('${dateStr}','${foodId}')">Speichern</button>
+      <div class="input-group"><label class="input-label">${t('name')}</label><input class="input" id="ef_name" type="text" value="${esc(f.name)}"></div>
+      ${(()=>{const tr=getTrackedMacros();const fields=[
+        tr.includes('calories')?`<div class="input-group"><label class="input-label">${t('calories')}</label><input class="input" id="ef_cal" type="number" inputmode="decimal" value="${f.calories}"></div>`:'',
+        tr.includes('protein')?`<div class="input-group"><label class="input-label">${t('protein')} (g)</label><input class="input" id="ef_pro" type="number" inputmode="decimal" value="${f.protein}"></div>`:'',
+        tr.includes('carbs')?`<div class="input-group"><label class="input-label">${t('carbs')} (g)</label><input class="input" id="ef_carb" type="number" inputmode="decimal" value="${f.carbs}"></div>`:'',
+        tr.includes('fat')?`<div class="input-group"><label class="input-label">${t('fat')} (g)</label><input class="input" id="ef_fat" type="number" inputmode="decimal" value="${f.fat}"></div>`:'',
+      ].filter(Boolean);let html='';for(let i=0;i<fields.length;i+=2){html+=`<div class="input-row">${fields[i]}${fields[i+1]||''}</div>`;}return html;})()}
+      <button class="btn btn-primary btn-full" onclick="saveEditFood('${dateStr}','${foodId}')">${t('save')}</button>
     </div>`, t('edit_food_title'));
 }
 
@@ -971,16 +957,16 @@ function clearDayActivity(dateStr) {
 
 function openGoalsModal() {
   const g = getGoals();
-  openOverlay(`
-    <div class="input-row">
-      <div class="input-group"><label class="input-label">${t('calories')} (kcal)</label><input class="input" id="g_cal" type="number" inputmode="decimal" value="${g.calories}"></div>
-      <div class="input-group"><label class="input-label">Protein (g)</label><input class="input" id="g_pro" type="number" inputmode="decimal" value="${g.protein}"></div>
-    </div>
-    <div class="input-row">
-      <div class="input-group"><label class="input-label">Carbs (g)</label><input class="input" id="g_carb" type="number" inputmode="decimal" value="${g.carbs}"></div>
-      <div class="input-group"><label class="input-label">Fat (g)</label><input class="input" id="g_fat" type="number" inputmode="decimal" value="${g.fat}"></div>
-    </div>
-    <button class="btn btn-primary btn-full mt-8" onclick="saveGoals()">Save Goals</button>`, '⚙ Daily Goals');
+  const tr = getTrackedMacros();
+  const fields = [
+    tr.includes('calories')?`<div class="input-group"><label class="input-label">${t('calories')} (kcal)</label><input class="input" id="g_cal" type="number" inputmode="decimal" value="${g.calories}"></div>`:'',
+    tr.includes('protein')?`<div class="input-group"><label class="input-label">${t('protein')} (g)</label><input class="input" id="g_pro" type="number" inputmode="decimal" value="${g.protein}"></div>`:'',
+    tr.includes('carbs')?`<div class="input-group"><label class="input-label">${t('carbs')} (g)</label><input class="input" id="g_carb" type="number" inputmode="decimal" value="${g.carbs}"></div>`:'',
+    tr.includes('fat')?`<div class="input-group"><label class="input-label">${t('fat')} (g)</label><input class="input" id="g_fat" type="number" inputmode="decimal" value="${g.fat}"></div>`:'',
+  ].filter(Boolean);
+  let rows = '';
+  for (let i = 0; i < fields.length; i += 2) rows += `<div class="input-row">${fields[i]}${fields[i+1]||''}</div>`;
+  openOverlay(`${rows}<button class="btn btn-primary btn-full mt-8" onclick="saveGoals()">${t('save_goals')}</button>`, t('daily_goals'));
 }
 
 function saveGoals() {
@@ -1016,6 +1002,12 @@ const getSteps        = () => load(SK.STEPS,          {});
 const getReminders    = () => load(SK.REMINDERS,      []);
 const getSettings     = () => load(SK.SETTINGS,       {});
 const exMachineLabels = ex => ({ l1: ex?.seatLabel || 'Sitz', l2: ex?.chestLabel || 'Brust' });
+const ALL_MACROS = ['calories','protein','carbs','fat'];
+const getTrackedMacros = () => {
+  const s = getSettings();
+  if (!s.trackedMacros?.length) return ALL_MACROS;
+  return ALL_MACROS.filter(m => s.trackedMacros.includes(m));
+};
 
 function getAnalyticsDays() {
   const range = state.analyticsRange || '30d';
@@ -2769,15 +2761,9 @@ function renderAnalytics() {
       ${rangeBtn('7d','7 Tage')}${rangeBtn('30d','30 Tage')}${rangeBtn('all','Gesamt')}
     </div>
 
-    <div class="section-hd mt-8"><span class="section-title">Ernährung</span></div>
-    <div class="chart-card">
-      <div class="chart-title">Kalorien</div>
-      <div class="chart-wrap"><canvas id="c_cal" height="160"></canvas></div>
-    </div>
-    <div class="chart-card">
-      <div class="chart-title">Protein</div>
-      <div class="chart-wrap"><canvas id="c_pro" height="160"></canvas></div>
-    </div>
+    <div class="section-hd mt-8"><span class="section-title">${t('nutrition_section')}</span></div>
+    ${getTrackedMacros().includes('calories')?`<div class="chart-card"><div class="chart-title">${t('calories')}</div><div class="chart-wrap"><canvas id="c_cal" height="160"></canvas></div></div>`:''}
+    ${getTrackedMacros().includes('protein')?`<div class="chart-card"><div class="chart-title">${t('protein')}</div><div class="chart-wrap"><canvas id="c_pro" height="160"></canvas></div></div>`:''}
 
     <div class="section-hd mt-8"><span class="section-title">Körpergewicht</span></div>
     <div class="chart-card">
@@ -2825,8 +2811,9 @@ function renderAnalytics() {
 function drawNutCharts(days) {
   const labels = days.map(d => { const dt=parseDate(d); return `${dt.getMonth()+1}/${dt.getDate()}`; });
   const goals = getGoals();
-  const cal = document.getElementById('c_cal'); if (cal) drawBar(cal, labels, days.map(d=>getDayTotals(d).calories), { color:'#8b5cf6', goalLine:goals.calories });
-  const pro = document.getElementById('c_pro'); if (pro) drawBar(pro, labels, days.map(d=>getDayTotals(d).protein),  { color:'#3b82f6', goalLine:goals.protein });
+  const tr = getTrackedMacros();
+  const cal = document.getElementById('c_cal'); if (cal && tr.includes('calories')) drawBar(cal, labels, days.map(d=>getDayTotals(d).calories), { color:'#8b5cf6', goalLine:goals.calories });
+  const pro = document.getElementById('c_pro'); if (pro && tr.includes('protein'))  drawBar(pro, labels, days.map(d=>getDayTotals(d).protein),  { color:'#3b82f6', goalLine:goals.protein });
 }
 
 function drawWeightChart(days) {
@@ -3133,6 +3120,18 @@ function openSettings() {
         </div>
       </div>
       <div class="card" style="margin-bottom:12px">
+        <div class="card-title">${t('track_macros')}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${ALL_MACROS.map(m => {
+            const active = getTrackedMacros().includes(m);
+            const labels = {calories:t('calories'),protein:t('protein'),carbs:t('carbs'),fat:t('fat')};
+            return `<button onclick="toggleTrackedMacro('${m}')"
+              style="padding:7px 14px;border-radius:10px;border:2px solid ${active?'var(--accent)':'var(--border)'};background:${active?'var(--accent)18':'transparent'};color:${active?'var(--accent)':'var(--text2)'};font-size:13px;font-weight:600;cursor:pointer">${labels[m]}</button>`;
+          }).join('')}
+        </div>
+        <div style="font-size:11px;color:var(--text3);margin-top:8px">Mindestens 1 muss aktiv sein</div>
+      </div>
+      <div class="card" style="margin-bottom:12px">
         <div class="card-title">${t('step_goal')}</div>
         <div style="display:flex;gap:8px;align-items:center">
           <input class="input" id="set_stepgoal" type="number" inputmode="numeric" placeholder="10000" value="${s.stepGoal||''}" style="flex:1">
@@ -3154,6 +3153,20 @@ function setTheme(theme) {
 function setLang(language) {
   const s = load(SK.SETTINGS, {}); s.language = language;
   save(SK.SETTINGS, s); renderCurrentTab(); openSettings();
+}
+function toggleTrackedMacro(macro) {
+  const s = load(SK.SETTINGS, {});
+  let tracked = s.trackedMacros?.length ? [...s.trackedMacros] : [...ALL_MACROS];
+  if (tracked.includes(macro)) {
+    if (tracked.length <= 1) return; // mindestens 1 aktiv
+    tracked = tracked.filter(m => m !== macro);
+  } else {
+    tracked.push(macro);
+    tracked = ALL_MACROS.filter(m => tracked.includes(m)); // preserve order
+  }
+  s.trackedMacros = tracked;
+  save(SK.SETTINGS, s);
+  openSettings();
 }
 
 function saveSettingsField(key, value) {
