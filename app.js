@@ -1132,9 +1132,9 @@ function renderPlanExList(planId, mode) {
            style="width:42px;font-size:12px;padding:2px 5px;background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text1);text-align:center"
            onchange="(state.pickerMachineSettings['${id}']||(state.pickerMachineSettings['${id}']={})).chestSupport=this.value.trim()||null">`;
     return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">
-      <div style="display:flex;flex-direction:column;gap:2px;flex-shrink:0">
-        <button onclick="exMove(${i},-1,'${pid}','${md}')" ${i===0?'disabled':''} style="background:none;border:none;cursor:pointer;padding:2px 6px;color:${i===0?'var(--border)':'var(--text2)'};font-size:14px;line-height:1">▲</button>
-        <button onclick="exMove(${i}, 1,'${pid}','${md}')" ${i===state.pickerSelected.length-1?'disabled':''} style="background:none;border:none;cursor:pointer;padding:2px 6px;color:${i===state.pickerSelected.length-1?'var(--border)':'var(--text2)'};font-size:14px;line-height:1">▼</button>
+      <div style="display:flex;flex-direction:column;flex-shrink:0">
+        <button onclick="exMove(${i},-1,'${pid}','${md}')" ${i===0?'disabled':''} style="background:none;border:none;cursor:pointer;width:36px;height:28px;display:flex;align-items:center;justify-content:center;color:${i===0?'var(--border)':'var(--accent)'};font-size:18px;touch-action:manipulation">▲</button>
+        <button onclick="exMove(${i}, 1,'${pid}','${md}')" ${i===state.pickerSelected.length-1?'disabled':''} style="background:none;border:none;cursor:pointer;width:36px;height:28px;display:flex;align-items:center;justify-content:center;color:${i===state.pickerSelected.length-1?'var(--border)':'var(--accent)'};font-size:18px;touch-action:manipulation">▼</button>
       </div>
       <div style="width:26px;height:26px;border-radius:6px;background:${col};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff;flex-shrink:0">${ex.group.substring(0,2).toUpperCase()}</div>
       <div style="flex:1;min-width:0">
@@ -1168,8 +1168,16 @@ function _doExReorder(fromIdx, toIdx, planId, mode) {
   const [item] = arr.splice(fromIdx, 1);
   arr.splice(toIdx, 0, item);
   state.pickerSelected = arr;
-  if (mode === 'edit') openEditPlan(planId);
-  else openNewPlan(true);
+  // Replace only the list element — avoids resetting state via openEditPlan
+  const listEl = document.getElementById('planExList');
+  if (listEl) {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = renderPlanExList(planId === 'null' ? null : planId, mode);
+    listEl.replaceWith(tmp.firstElementChild);
+  } else {
+    if (mode === 'edit') openEditPlan(planId);
+    else openNewPlan(true);
+  }
 }
 
 function exMove(idx, dir, planId, mode) {
