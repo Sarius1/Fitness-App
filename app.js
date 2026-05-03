@@ -1101,10 +1101,12 @@ function selectColor(el, c) {
   state.pickerPlanColor = c;
 }
 
-function renderPlanExList() {
+function renderPlanExList(planId, mode) {
   if (!state.pickerSelected.length) return '';
   const allEx = getAllExercises();
-  const items = state.pickerSelected.map(id => {
+  const pid = planId || 'null';
+  const md  = mode  || 'new';
+  const items = state.pickerSelected.map((id, i) => {
     const ex = allEx.find(e => e.id === id);
     if (!ex) return '';
     const ms = state.pickerMachineSettings[id] || {};
@@ -1129,7 +1131,19 @@ function renderPlanExList() {
          <input type="text" placeholder="–" id="ms_chest_${id}" value="${esc(ms.chestSupport||'')}"
            style="width:42px;font-size:12px;padding:2px 5px;background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text1);text-align:center"
            onchange="(state.pickerMachineSettings['${id}']||(state.pickerMachineSettings['${id}']={})).chestSupport=this.value.trim()||null">`;
-    return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">
+    return `<div data-drag-idx="${i}" draggable="true"
+      ondragstart="exDragStart(event,${i})"
+      ondragover="exDragOver(event,${i})"
+      ondrop="exDrop(event,${i},'${pid}','${md}')"
+      ondragend="exDragEnd()"
+      style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);transition:background .15s">
+      <div class="drag-handle" touch-action="none"
+        onpointerdown="exPointerDown(event,${i})"
+        style="cursor:grab;padding:4px 6px;color:var(--text3);flex-shrink:0;touch-action:none;user-select:none">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="14" x2="20" y2="14"/><line x1="4" y1="20" x2="20" y2="20"/>
+        </svg>
+      </div>
       <div style="width:26px;height:26px;border-radius:6px;background:${col};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff;flex-shrink:0">${ex.group.substring(0,2).toUpperCase()}</div>
       <div style="flex:1;min-width:0">
         <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(ex.name)}</div>
@@ -1137,17 +1151,100 @@ function renderPlanExList() {
       </div>
     </div>`;
   }).join('');
-  return `<div style="margin-bottom:10px">${items}</div>`;
+  return `<div id="planExList" style="margin-bottom:10px">${items}</div>`;
+}
+
+function _savePlanFormToState() {
+  state.pickerPlanName = document.getElementById('pn_name')?.value || state.pickerPlanName;
+  state.pickerSelected.forEach(id => {
+    const ms = state.pickerMachineSettings[id] || (state.pickerMachineSettings[id] = {});
+    const s  = document.getElementById('ms_seat_'+id)?.value.trim();
+    const c  = document.getElementById('ms_chest_'+id)?.value.trim();
+    const l1 = document.getElementById('ms_lbl1_'+id)?.value.trim();
+    const l2 = document.getElementById('ms_lbl2_'+id)?.value.trim();
+    if (s  !== undefined) ms.seatPos      = s  || null;
+    if (c  !== undefined) ms.chestSupport = c  || null;
+    if (l1) ms.seatLabel   = l1;
+    if (l2) ms.chestLabel  = l2;
+  });
+}
+
+function _doExReorder(fromIdx, toIdx, planId, mode) {
+  if (fromIdx === toIdx || fromIdx === null) return;
+  _savePlanFormToState();
+  const arr = [...state.pickerSelected];
+  const [item] = arr.splice(fromIdx, 1);
+  arr.splice(toIdx, 0, item);
+  state.pickerSelected = arr;
+  if (mode === 'edit') openEditPlan(planId);
+  else openNewPlan(true);
+}
+
+// ── HTML5 Drag (desktop) ──────────────────────────────────
+function exDragStart(e, idx) {
+  state._dragIdx = idx;
+  e.dataTransfer.effectAllowed = 'move';
+}
+function exDragOver(e, idx) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('[data-drag-idx]').forEach(r => r.style.background = '');
+  const el = document.querySelector(`[data-drag-idx="${idx}"]`);
+  if (el) el.style.background = 'var(--accent)18';
+}
+function exDrop(e, toIdx, planId, mode) {
+  e.preventDefault();
+  document.querySelectorAll('[data-drag-idx]').forEach(r => r.style.background = '');
+  _doExReorder(state._dragIdx, toIdx, planId, mode);
+}
+function exDragEnd() {
+  document.querySelectorAll('[data-drag-idx]').forEach(r => r.style.background = '');
+  state._dragIdx = null;
+}
+
+// ── Touch/Pointer drag (mobile) ───────────────────────────
+function exPointerDown(e, idx) {
+  if (e.pointerType === 'mouse') return; // handled by HTML5 drag
+  e.currentTarget.setPointerCapture(e.pointerId);
+  state._dragIdx   = idx;
+  state._dragMoved = false;
+  e.currentTarget.addEventListener('pointermove', _exPointerMove);
+  e.currentTarget.addEventListener('pointerup',   _exPointerUp);
+}
+function _exPointerMove(e) {
+  state._dragMoved = true;
+  const el = document.elementFromPoint(e.clientX, e.clientY);
+  const row = el?.closest('[data-drag-idx]');
+  document.querySelectorAll('[data-drag-idx]').forEach(r => r.style.background = '');
+  if (row) {
+    row.style.background = 'var(--accent)18';
+    state._dragHoverIdx = parseInt(row.dataset.dragIdx);
+  }
+}
+function _exPointerUp(e) {
+  e.currentTarget.removeEventListener('pointermove', _exPointerMove);
+  e.currentTarget.removeEventListener('pointerup',   _exPointerUp);
+  document.querySelectorAll('[data-drag-idx]').forEach(r => r.style.background = '');
+  if (state._dragMoved && state._dragHoverIdx !== undefined && state._dragHoverIdx !== state._dragIdx) {
+    const row = document.querySelector(`[data-drag-idx="${state._dragIdx}"]`);
+    const planId = row?.closest('[data-plan-id]')?.dataset.planId || null;
+    const mode   = row?.closest('[data-plan-mode]')?.dataset.planMode || 'new';
+    _doExReorder(state._dragIdx, state._dragHoverIdx, planId, mode);
+  }
+  state._dragIdx = state._dragHoverIdx = null;
+  state._dragMoved = false;
 }
 
 function openNewPlan(preserveSelection = false) {
   if (!preserveSelection) { state.pickerSelected = []; state.pickerMachineSettings = {}; state.pickerPlanColor = PLAN_COLORS[0]; }
   openOverlay(`
+    <div data-plan-id="null" data-plan-mode="new">
     <div class="input-group"><label class="input-label">${t('plan_name')}</label><input class="input" id="pn_name" type="text" placeholder="e.g. Push Day" value="${esc(state.pickerPlanName||'')}"></div>
     <div class="input-group"><label class="input-label">${t('color')}</label><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">${colorSwatches(state.pickerPlanColor)}</div></div>
     <button class="btn btn-secondary btn-full" style="margin-bottom:10px" onclick="openExPicker(null,'new')">${t('choose_ex')} <span style="color:var(--accent)">${state.pickerSelected.length ? '('+state.pickerSelected.length+')' : ''}</span></button>
-    ${renderPlanExList()}
-    <button class="btn btn-primary btn-full" onclick="savePlan(null)">${t('create')}</button>`, 'Neuer Plan');
+    ${renderPlanExList(null, 'new')}
+    <button class="btn btn-primary btn-full" onclick="savePlan(null)">${t('create')}</button>
+    </div>`, t('new_plan_title'));
 }
 
 function openEditPlan(planId) {
@@ -1163,11 +1260,13 @@ function openEditPlan(planId) {
     };
   });
   openOverlay(`
-    <div class="input-group"><label class="input-label">Plan Name</label><input class="input" id="pn_name" type="text" value="${esc(plan.name)}"></div>
-    <div class="input-group"><label class="input-label">Color</label><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">${colorSwatches(state.pickerPlanColor)}</div></div>
+    <div data-plan-id="${planId}" data-plan-mode="edit">
+    <div class="input-group"><label class="input-label">${t('plan_name')}</label><input class="input" id="pn_name" type="text" value="${esc(plan.name)}"></div>
+    <div class="input-group"><label class="input-label">${t('color')}</label><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">${colorSwatches(state.pickerPlanColor)}</div></div>
     <button class="btn btn-secondary btn-full" style="margin-bottom:10px" onclick="openExPicker('${planId}','edit')">${t('edit_ex')} <span style="color:var(--accent)">(${state.pickerSelected.length})</span></button>
-    ${renderPlanExList()}
-    <button class="btn btn-primary btn-full" onclick="savePlan('${planId}')">${t('save_changes')}</button>`, 'Plan bearbeiten');
+    ${renderPlanExList(planId, 'edit')}
+    <button class="btn btn-primary btn-full" onclick="savePlan('${planId}')">${t('save_changes')}</button>
+    </div>`, t('edit_plan_title'));
 }
 
 function savePlan(planId) {
