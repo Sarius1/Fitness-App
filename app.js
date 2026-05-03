@@ -1077,7 +1077,7 @@ function renderPlans() {
       <div class="plan-card-body">
         <div class="plan-ex-chips">${chips}${more}</div>
         <div class="plan-actions">
-          <button class="btn btn-primary btn-sm" style="flex:1" onclick="startWorkout('${p.id}')">${t('start')}</button>
+          <button class="btn btn-primary btn-sm" style="flex:1" onclick="promptStartWorkout('${p.id}')">${t('start')}</button>
           <button class="btn btn-secondary btn-sm" onclick="openEditPlan('${p.id}')">${t('edit')}</button>
           <button class="btn btn-danger btn-sm" onclick="deletePlan('${p.id}')">✕</button>
         </div>
