@@ -50,7 +50,7 @@ const EXERCISE_DB = [
   // ── Back ────────────────────────────────────────────────
   {id:'p004',name:'Latzug',                      group:'Lats',        groups:['Lats'],                         gif:GIF+'lat pulldown.gif'},
   {id:'p005',name:'Maschinen-Rudern (sitzend)',  group:'Lats',        groups:['Lats','Traps'],                 gif:GIF+'Seated-Machine-Row.gif'},
-  {id:'p006',name:'T-Stangen-Rudern (Maschine)',group:'Lats',        groups:['Lats','Traps'],                 gif:GIF+'t-bar-row-machine.gif'},
+  {id:'p006',name:'T-Stangen-Rudern (Maschine)',group:'Traps',       groups:['Traps','Rear Delts'],           gif:GIF+'t-bar-row-machine.gif'},
   // ── Shoulders ───────────────────────────────────────────
   {id:'p007',name:'Maschinen-Schulterpresse',    group:'Front Delts', groups:['Front Delts','Side Delts'],     gif:GIF+'Machine-Shoulder-Press.gif'},
   {id:'p008',name:'Maschinen-Seitheben',         group:'Side Delts',  groups:['Side Delts'],                   gif:GIF+'Lateral raise machine.gif'},
