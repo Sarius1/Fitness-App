@@ -589,17 +589,17 @@ function openDayView(dateStr) {
         ${foodsHtml}
         <button class="btn btn-secondary btn-sm" style="margin-top:10px;width:100%" onclick="openAddFoodModal('${dateStr}')">${t('add_food')}</button>
       </div>
-      <div class="card mt-12">
+      ${showSteps() ? `<div class="card mt-12">
         <div class="card-title">${t('steps')}</div>
         <div style="display:flex;gap:8px;align-items:center">
           <input class="input" id="steps_input" type="number" inputmode="numeric" placeholder="z.B. 8500"
             value="${todaySteps || ''}" style="flex:1;text-align:right;font-size:16px;font-weight:700;padding:9px 12px">
           ${stepGoal ? `<span style="font-size:12px;color:var(--text3);white-space:nowrap">/ ${stepGoal}</span>` : ''}
-          <button class="btn btn-primary btn-sm" onclick="saveSteps('${dateStr}')">Speichern</button>
+          <button class="btn btn-primary btn-sm" onclick="saveSteps('${dateStr}')">${t('save')}</button>
         </div>
         ${todaySteps && stepGoal ? `<div class="prog-bar-track" style="margin-top:8px"><div class="prog-bar-fill prog-bar-green" style="width:${Math.min((todaySteps/stepGoal)*100,100)}%"></div></div>` : ''}
-      </div>
-      <button class="btn btn-secondary btn-full mt-12" onclick="openAddRunFromDay('${dateStr}')">🏃 Run loggen</button>
+      </div>` : ''}
+      ${showRunning() ? `<button class="btn btn-secondary btn-full mt-12" onclick="openAddRunFromDay('${dateStr}')">🏃 ${t('log_run')}</button>` : ''}
       ${renderDaySupplements(dateStr)}
     </div>`);
 }
@@ -1008,6 +1008,8 @@ const getTrackedMacros = () => {
   if (!s.trackedMacros?.length) return ALL_MACROS;
   return ALL_MACROS.filter(m => s.trackedMacros.includes(m));
 };
+const showRunning = () => getSettings().showRunning !== false;
+const showSteps   = () => getSettings().showSteps   !== false;
 
 function getAnalyticsDays() {
   const range = state.analyticsRange || '30d';
@@ -1031,7 +1033,9 @@ function renderWorkouts() {
   const el = document.getElementById('tab-workouts');
   const sub = state.workoutSubTab;
   const subLabels = { plans:t('plans_tab'), splits:t('splits_tab'), history:t('history_tab'), running:t('running_tab') };
-  const tabs = ['plans','splits','history','running'].map(s =>
+  const subList = showRunning() ? ['plans','splits','history','running'] : ['plans','splits','history'];
+  if (!showRunning() && state.workoutSubTab === 'running') state.workoutSubTab = 'plans';
+  const tabs = subList.map(s =>
     `<button class="sub-tab${sub===s?' active':''}" onclick="switchWorkoutSub('${s}')">${subLabels[s]}</button>`
   ).join('');
   el.innerHTML = `<div class="sub-tabs">${tabs}</div><div id="wo-sub"></div>`;
@@ -2922,7 +2926,7 @@ function renderAnalytics() {
       <div class="chart-wrap"><canvas id="c_weight" height="160"></canvas></div>
     </div>
 
-    ${getSettings().stepGoal ? `<div class="section-hd mt-8"><span class="section-title">Schritte</span></div>
+    ${showSteps() && getSettings().stepGoal ? `<div class="section-hd mt-8"><span class="section-title">Schritte</span></div>
     <div class="chart-card">
       <div class="chart-title">Schritte pro Tag</div>
       <div class="chart-wrap"><canvas id="c_steps" height="160"></canvas></div>
@@ -2941,19 +2945,20 @@ function renderAnalytics() {
       <div class="chart-wrap"><canvas id="c_gym_1rm" height="140"></canvas></div>
     </div>
 
-    <div class="section-hd mt-8"><span class="section-title">Laufen</span></div>
+    ${showRunning() ? `
+    <div class="section-hd mt-8"><span class="section-title">${t('running_section')}</span></div>
     <div class="chart-card">
-      <div class="chart-title">Pace — Normal Runs (min/km)</div>
+      <div class="chart-title">${t('pace_chart')}</div>
       <div class="chart-wrap"><canvas id="c_run_pace" height="150"></canvas></div>
     </div>
     <div class="chart-card">
-      <div class="chart-title">Weekly Distance (km)</div>
+      <div class="chart-title">${t('weekly_dist')}</div>
       <div class="chart-wrap"><canvas id="c_run_wk" height="150"></canvas></div>
     </div>
     ${runs.some(r=>r.type==='interval') ? `<div class="chart-card">
-      <div class="chart-title" style="color:#f97316">⚡ Interval Sessions — Reps per Session</div>
+      <div class="chart-title" style="color:#f97316">${t('interval_chart')}</div>
       <div class="chart-wrap"><canvas id="c_run_intervals" height="140"></canvas></div>
-    </div>` : ''}` ;
+    </div>` : ''}` : ''}` ;
 
   const analyticsDays = getAnalyticsDays();
   requestAnimationFrame(() => { drawNutCharts(analyticsDays); drawWeightChart(analyticsDays); drawGymCharts(hist); drawRunCharts(runs); drawStepsChart(analyticsDays); initAnalyticsMuscleViewer(); });
@@ -3227,6 +3232,103 @@ function init() {
 
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
   initReminders();
+  if (!getSettings().onboardingDone) { showOnboarding(); } else { renderNutrition(); }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ONBOARDING
+═══════════════════════════════════════════════════════════ */
+function showOnboarding() {
+  const s = { trackedMacros:[...ALL_MACROS], showRunning:true, showSteps:true,
+               calories:2500, protein:150, carbs:300, fat:70, stepGoal:10000 };
+  const macroLabels = {calories:'Kalorien',protein:'Protein',carbs:'Kohlenhydrate',fat:'Fett'};
+  function chip(key, label, active, group) {
+    const col = group==='feature'?'#6c63ff':'var(--accent)';
+    return `<button type="button" data-key="${key}" data-group="${group}"
+      onclick="obToggle(this,'${key}','${group}')"
+      style="padding:9px 16px;border-radius:12px;border:2px solid ${active?col:'var(--border)'};background:${active?col+'18':'transparent'};color:${active?col:'var(--text2)'};font-size:14px;font-weight:600;cursor:pointer;transition:all .15s">${label}</button>`;
+  }
+
+  openPanel(`
+    <div style="display:flex;flex-direction:column;height:100%;background:var(--bg)">
+      <div style="padding:32px 20px 20px;flex:1;overflow-y:auto">
+        <div style="font-size:28px;font-weight:800;margin-bottom:6px">Willkommen 👋</div>
+        <div style="font-size:15px;color:var(--text2);margin-bottom:28px">Was möchtest du tracken?</div>
+
+        <div style="font-size:13px;font-weight:700;color:var(--text3);margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em">Makros</div>
+        <div id="ob_macros" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px">
+          ${ALL_MACROS.map(m => chip(m, macroLabels[m], true, 'macro')).join('')}
+        </div>
+
+        <div style="font-size:13px;font-weight:700;color:var(--text3);margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em">Features</div>
+        <div id="ob_features" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:28px">
+          ${chip('showSteps','👟 Schritte tracken', true, 'feature')}
+          ${chip('showRunning','🏃 Laufen tracken', true, 'feature')}
+        </div>
+
+        <div id="ob_goals">
+          <div style="font-size:13px;font-weight:700;color:var(--text3);margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em">Ziele (optional)</div>
+          <div id="ob_macro_goals" style="display:flex;flex-direction:column;gap:10px">
+            ${ALL_MACROS.map(m => `<div class="input-group ob-goal-field" data-macro="${m}">
+              <label class="input-label">${macroLabels[m]} (${m==='calories'?'kcal':'g'})</label>
+              <input class="input" id="ob_${m}" type="number" inputmode="decimal"
+                placeholder="${{calories:2500,protein:150,carbs:300,fat:70}[m]}"
+                value="${{calories:2500,protein:150,carbs:300,fat:70}[m]}">
+            </div>`).join('')}
+          </div>
+          <div class="input-group ob-goal-field" id="ob_steps_field" style="margin-top:10px">
+            <label class="input-label">Schrittziel</label>
+            <input class="input" id="ob_stepgoal" type="number" inputmode="numeric" placeholder="10000" value="10000">
+          </div>
+        </div>
+      </div>
+      <div style="padding:16px 20px;border-top:1px solid var(--border)">
+        <button class="btn btn-primary btn-full" style="font-size:16px;padding:14px" onclick="finishOnboarding()">Loslegen →</button>
+      </div>
+    </div>`);
+}
+
+function obToggle(btn, key, group) {
+  const col = group==='feature'?'#6c63ff':'var(--accent)';
+  const active = btn.style.borderColor === col || btn.style.background.includes(col.replace('#',''));
+  const nowActive = !active;
+  btn.style.borderColor = nowActive ? col : 'var(--border)';
+  btn.style.background  = nowActive ? col+'18' : 'transparent';
+  btn.style.color       = nowActive ? col : 'var(--text2)';
+  // Show/hide related goal fields
+  if (group === 'macro') {
+    const field = document.querySelector(`.ob-goal-field[data-macro="${key}"]`);
+    if (field) field.style.display = nowActive ? '' : 'none';
+  }
+  if (key === 'showSteps') {
+    const f = document.getElementById('ob_steps_field');
+    if (f) f.style.display = nowActive ? '' : 'none';
+  }
+}
+
+function finishOnboarding() {
+  const trackedMacros = ALL_MACROS.filter(m => {
+    const btn = document.querySelector(`[data-key="${m}"]`);
+    return btn && btn.style.borderColor !== 'var(--border)' && !btn.style.borderColor.includes('128,128');
+  });
+  const showRunningOn = (() => { const b = document.querySelector('[data-key="showRunning"]'); return b && b.style.borderColor !== 'var(--border)'; })();
+  const showStepsOn   = (() => { const b = document.querySelector('[data-key="showSteps"]');   return b && b.style.borderColor !== 'var(--border)'; })();
+  const goals = {
+    calories: parseFloat(document.getElementById('ob_calories')?.value) || 2500,
+    protein:  parseFloat(document.getElementById('ob_protein')?.value)  || 150,
+    carbs:    parseFloat(document.getElementById('ob_carbs')?.value)    || 300,
+    fat:      parseFloat(document.getElementById('ob_fat')?.value)      || 70,
+  };
+  const stepGoal = parseInt(document.getElementById('ob_stepgoal')?.value) || 10000;
+  const s = load(SK.SETTINGS, {});
+  s.trackedMacros = trackedMacros.length ? trackedMacros : ALL_MACROS;
+  s.showRunning   = showRunningOn;
+  s.showSteps     = showStepsOn;
+  if (showStepsOn) s.stepGoal = stepGoal;
+  s.onboardingDone = true;
+  save(SK.SETTINGS, s);
+  save(SK.GOALS, goals);
+  closePanel();
   renderNutrition();
 }
 
@@ -3268,6 +3370,21 @@ function openSettings() {
         <div style="display:flex;gap:8px">
           <button onclick="setTheme('dark')" style="flex:1;padding:10px;border-radius:10px;border:2px solid ${isDark?'var(--accent)':'var(--border)'};background:${isDark?'var(--accent)18':'transparent'};cursor:pointer;font-size:13px;font-weight:600;color:var(--text1)">${t('dark')}</button>
           <button onclick="setTheme('light')" style="flex:1;padding:10px;border-radius:10px;border:2px solid ${!isDark?'var(--accent)':'var(--border)'};background:${!isDark?'var(--accent)18':'transparent'};cursor:pointer;font-size:13px;font-weight:600;color:var(--text1)">${t('light')}</button>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-title">Features</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          ${[['showRunning','🏃 Laufen'],['showSteps','👟 Schritte']].map(([key,label]) => {
+            const on = getSettings()[key] !== false;
+            return `<div style="display:flex;align-items:center;justify-content:space-between">
+              <span style="font-size:14px;font-weight:600">${label}</span>
+              <button onclick="saveSettingsField('${key}',${!on});renderCurrentTab();openSettings()"
+                style="width:48px;height:26px;border-radius:13px;border:none;cursor:pointer;background:${on?'var(--accent)':'var(--border)'};position:relative;transition:background .2s">
+                <span style="position:absolute;top:3px;${on?'right:3px':'left:3px'};width:20px;height:20px;border-radius:50%;background:#fff;transition:all .2s"></span>
+              </button>
+            </div>`;
+          }).join('')}
         </div>
       </div>
       <div class="card" style="margin-bottom:12px">
