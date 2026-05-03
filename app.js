@@ -37,34 +37,34 @@ const GROUP_COLORS = {
   'Obliques':'#ca8a04',
 };
 const PLAN_COLORS = ['#8b5cf6','#3b82f6','#22c55e','#f59e0b','#ef4444','#ec4899','#14b8a6','#f97316'];
-const GIF = '%C3%BCbungsmodelle/';
+const GIF = 'gifs/';
 const EXERCISE_DB = [
   // ── Runs ────────────────────────────────────────────────
   {id:'r001',name:'Run',              group:'Runs', groups:['Runs']},
   {id:'r002',name:'Intervall Run',   group:'Runs', groups:['Runs']},
   {id:'r003',name:'Tempo Run',       group:'Runs', groups:['Runs']},
   // ── Chest ───────────────────────────────────────────────
-  {id:'p001',name:'Bankdrücken',                 group:'Chest',       groups:['Chest'],                        gif:GIF+'Bench%20press.gif'},
+  {id:'p001',name:'Bankdrücken',                 group:'Chest',       groups:['Chest'],                        gif:GIF+'Bench-press.gif'},
   {id:'p002',name:'Butterfly-Maschine',          group:'Chest',       groups:['Chest'],                        gif:GIF+'butterfly_uebung-butterfly_maschine.gif'},
   {id:'p003',name:'Hebel-Schrägbankdrücken',     group:'Upper Chest', groups:['Upper Chest'],                  gif:GIF+'Lever-Incline-Chest-Press.gif'},
   // ── Back ────────────────────────────────────────────────
-  {id:'p004',name:'Latzug',                      group:'Lats',        groups:['Lats'],                         gif:GIF+'lat%20pulldown.gif'},
+  {id:'p004',name:'Latzug',                      group:'Lats',        groups:['Lats'],                         gif:GIF+'lat-pulldown.gif'},
   {id:'p005',name:'Maschinen-Rudern (sitzend)',  group:'Lats',        groups:['Lats','Traps'],                 gif:GIF+'Seated-Machine-Row.gif'},
   {id:'p006',name:'T-Stangen-Rudern (Maschine)',group:'Traps',       groups:['Traps','Rear Delts'],           gif:GIF+'t-bar-row-machine.gif'},
   // ── Shoulders ───────────────────────────────────────────
   {id:'p007',name:'Maschinen-Schulterpresse',    group:'Front Delts', groups:['Front Delts','Side Delts'],     gif:GIF+'Machine-Shoulder-Press.gif'},
-  {id:'p008',name:'Maschinen-Seitheben',         group:'Side Delts',  groups:['Side Delts'],                   gif:GIF+'Lateral%20raise%20machine.gif'},
-  {id:'p009',name:'Hintere Schulter (Maschine)',group:'Rear Delts',  groups:['Rear Delts'],                   gif:GIF+'rear%20delts.gif'},
+  {id:'p008',name:'Maschinen-Seitheben',         group:'Side Delts',  groups:['Side Delts'],                   gif:GIF+'Lateral-raise-machine.gif'},
+  {id:'p009',name:'Hintere Schulter (Maschine)',group:'Rear Delts',  groups:['Rear Delts'],                   gif:GIF+'rear-delts.gif'},
   // ── Arms ────────────────────────────────────────────────
   {id:'p010',name:'Preacher Curl',               group:'Biceps',      groups:['Biceps'],                       gif:GIF+'Preacher-Curl.gif'},
-  {id:'p011',name:'Trizeps Pushdown',            group:'Triceps',     groups:['Triceps'],                      gif:GIF+'Tricep%20Pushdown.gif'},
+  {id:'p011',name:'Trizeps Pushdown',            group:'Triceps',     groups:['Triceps'],                      gif:GIF+'Tricep-Pushdown.gif'},
   {id:'p012',name:'Einarm Trizeps Pushdown',     group:'Triceps',     groups:['Triceps'],                      gif:GIF+'One-arm-triceps-pushdown.gif'},
   // ── Legs ────────────────────────────────────────────────
   {id:'p013',name:'Hack Squat',                  group:'Quads',       groups:['Quads'],                        gif:GIF+'hack-squat-min.gif'},
   {id:'p014',name:'Beinstreckmaschine',          group:'Quads',       groups:['Quads'],                        gif:GIF+'leg-extension-machine.gif'},
   {id:'p015',name:'Liegend Beincurl',            group:'Hamstrings',  groups:['Hamstrings'],                   gif:GIF+'Lying-leg-curl-gif.gif'},
   {id:'p016',name:'Adduktoren-Maschine',         group:'Adductors',   groups:['Adductors'],                    gif:GIF+'adductors.gif'},
-  {id:'p017',name:'Abduktoren-Maschine',         group:'Abductors',   groups:['Abductors'],                    gif:GIF+'Abductor%20machine.gif'},
+  {id:'p017',name:'Abduktoren-Maschine',         group:'Abductors',   groups:['Abductors'],                    gif:GIF+'Abductor-machine.gif'},
   // ── Core ────────────────────────────────────────────────
   {id:'p018',name:'Bauchmuskel-Maschine',        group:'Abs',         groups:['Abs'],                          gif:GIF+'abs.gif'},
 ];
