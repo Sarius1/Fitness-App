@@ -37,10 +37,36 @@ const GROUP_COLORS = {
   'Obliques':'#ca8a04',
 };
 const PLAN_COLORS = ['#8b5cf6','#3b82f6','#22c55e','#f59e0b','#ef4444','#ec4899','#14b8a6','#f97316'];
+const GIF = 'Übungsmodelle/';
 const EXERCISE_DB = [
-  {id:'r001',name:'Run',group:'Runs',groups:['Runs']},
-  {id:'r002',name:'Intervall Run',group:'Runs',groups:['Runs']},
-  {id:'r003',name:'Tempo Run',group:'Runs',groups:['Runs']},
+  // ── Runs ────────────────────────────────────────────────
+  {id:'r001',name:'Run',              group:'Runs', groups:['Runs']},
+  {id:'r002',name:'Intervall Run',   group:'Runs', groups:['Runs']},
+  {id:'r003',name:'Tempo Run',       group:'Runs', groups:['Runs']},
+  // ── Chest ───────────────────────────────────────────────
+  {id:'p001',name:'Bankdrücken',                 group:'Chest',       groups:['Chest'],                        gif:GIF+'Bench press.gif'},
+  {id:'p002',name:'Butterfly-Maschine',          group:'Chest',       groups:['Chest'],                        gif:GIF+'butterfly_uebung-butterfly_maschine.gif'},
+  {id:'p003',name:'Hebel-Schrägbankdrücken',     group:'Upper Chest', groups:['Upper Chest'],                  gif:GIF+'Lever-Incline-Chest-Press.gif'},
+  // ── Back ────────────────────────────────────────────────
+  {id:'p004',name:'Latzug',                      group:'Lats',        groups:['Lats'],                         gif:GIF+'lat pulldown.gif'},
+  {id:'p005',name:'Maschinen-Rudern (sitzend)',  group:'Lats',        groups:['Lats','Traps'],                 gif:GIF+'Seated-Machine-Row.gif'},
+  {id:'p006',name:'T-Stangen-Rudern (Maschine)',group:'Lats',        groups:['Lats','Traps'],                 gif:GIF+'t-bar-row-machine.gif'},
+  // ── Shoulders ───────────────────────────────────────────
+  {id:'p007',name:'Maschinen-Schulterpresse',    group:'Front Delts', groups:['Front Delts','Side Delts'],     gif:GIF+'Machine-Shoulder-Press.gif'},
+  {id:'p008',name:'Maschinen-Seitheben',         group:'Side Delts',  groups:['Side Delts'],                   gif:GIF+'Lateral raise machine.gif'},
+  {id:'p009',name:'Hintere Schulter (Maschine)',group:'Rear Delts',  groups:['Rear Delts'],                   gif:GIF+'rear delts.gif'},
+  // ── Arms ────────────────────────────────────────────────
+  {id:'p010',name:'Preacher Curl',               group:'Biceps',      groups:['Biceps'],                       gif:GIF+'Preacher-Curl.gif'},
+  {id:'p011',name:'Trizeps Pushdown',            group:'Triceps',     groups:['Triceps'],                      gif:GIF+'Tricep Pushdown.gif'},
+  {id:'p012',name:'Einarm Trizeps Pushdown',     group:'Triceps',     groups:['Triceps'],                      gif:GIF+'One-arm-triceps-pushdown.gif'},
+  // ── Legs ────────────────────────────────────────────────
+  {id:'p013',name:'Hack Squat',                  group:'Quads',       groups:['Quads'],                        gif:GIF+'hack-squat-min.gif'},
+  {id:'p014',name:'Beinstreckmaschine',          group:'Quads',       groups:['Quads'],                        gif:GIF+'leg-extension-machine.gif'},
+  {id:'p015',name:'Liegend Beincurl',            group:'Hamstrings',  groups:['Hamstrings'],                   gif:GIF+'Lying-leg-curl-gif.gif'},
+  {id:'p016',name:'Adduktoren-Maschine',         group:'Adductors',   groups:['Adductors'],                    gif:GIF+'adductors.gif'},
+  {id:'p017',name:'Abduktoren-Maschine',         group:'Abductors',   groups:['Abductors'],                    gif:GIF+'Abductor machine.gif'},
+  // ── Core ────────────────────────────────────────────────
+  {id:'p018',name:'Bauchmuskel-Maschine',        group:'Abs',         groups:['Abs'],                          gif:GIF+'abs.gif'},
 ];
 
 /* ═══════════════════════════════════════════════════════════
@@ -1228,8 +1254,11 @@ function renderExPicker(planId, mode) {
     const editBtn = isCustom
       ? `<button class="icon-btn" style="color:var(--text3);padding:4px;flex-shrink:0" onclick="event.stopPropagation();openCustomEx('${planId}','${mode}','${e.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>`
       : '';
+    const gifThumb = e.gif
+      ? `<img src="${e.gif}" style="width:44px;height:44px;object-fit:cover;border-radius:6px;flex-shrink:0;background:var(--card2)">`
+      : `<div class="ex-badge" style="background:${col};flex-shrink:0">${abbr}</div>`;
     return `<div class="ex-row${sel?' selected':''}" data-exid="${e.id}" onclick="toggleEx('${e.id}','${planId}','${mode}')">
-      <div class="ex-badge" style="background:${col}">${abbr}</div>
+      ${gifThumb}
       <div style="flex:1;min-width:0"><div class="ex-row-name">${esc(e.name)}</div><div class="ex-row-group" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${groupLabel}</div></div>
       ${editBtn}
       <div class="ex-check">${sel?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" width="12" height="12"><polyline points="20 6 9 17 4 12"/></svg>':''}</div>
@@ -1281,8 +1310,10 @@ function openCustomEx(planId, mode, editId) {
     return `<button type="button" data-g="${g}" data-active="${active?'1':'0'}" onclick="toggleCustomExGroup(this,'${g}')"
       style="padding:4px 10px;border-radius:8px;border:2px solid ${active?col:'var(--border)'};background:${active?col+'22':'transparent'};color:${active?col:'var(--text2)'};font-size:12px;font-weight:600;cursor:pointer">${g}</button>`;
   }).join('');
-  const imgPreview = existing?.imageData
-    ? `<img src="${existing.imageData}" style="width:100%;max-height:140px;object-fit:cover;border-radius:10px;margin-bottom:6px">`
+  const currentImg = existing?.imageData || null;
+  const imgSection = currentImg
+    ? `<img id="ce_cur_img" src="${currentImg}" style="width:100%;max-height:140px;object-fit:cover;border-radius:10px;margin-bottom:6px">
+       <button type="button" class="btn btn-secondary btn-sm" style="margin-bottom:6px" onclick="document.getElementById('ce_cur_img').style.display='none';this.style.display='none';state._clearExImg=true">× Bild entfernen</button>`
     : '';
   openOverlay(`
     <div style="display:flex;flex-direction:column;gap:12px">
@@ -1295,9 +1326,9 @@ function openCustomEx(planId, mode, editId) {
         <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px" id="ce_groups">${groupChips}</div>
       </div>
       <div class="input-group">
-        <label class="input-label">Bild (optional)</label>
-        ${imgPreview}
-        <input type="file" accept="image/*" id="ce_image" style="font-size:13px" onchange="previewCustomExImage(this)">
+        <label class="input-label">Bild / GIF (optional)</label>
+        ${imgSection}
+        <input type="file" accept="image/*,.gif" id="ce_image" style="font-size:13px" onchange="previewCustomExImage(this)">
         <img id="ce_img_preview" style="display:none;width:100%;max-height:140px;object-fit:cover;border-radius:10px;margin-top:6px">
       </div>
       <button class="btn btn-primary btn-full" onclick="saveCustomEx('${planId}','${mode}','${editId||''}')">${existing?t('save_changes'):'Übung hinzufügen'}</button>
@@ -1337,17 +1368,18 @@ function saveCustomEx(planId, mode, editId) {
     .map(b => b.dataset.g).filter(Boolean);
   if (!groups.length) { showToast('Mindestens 1 Muskelgruppe wählen'); return; }
   const previewImg = document.getElementById('ce_img_preview');
-  const imageData = (previewImg?.style.display !== 'none' && previewImg?.src?.startsWith('data:'))
+  const newImageData = (previewImg?.style.display !== 'none' && previewImg?.src?.startsWith('data:'))
     ? previewImg.src : null;
   const custom = load(SK.CUSTOM_EX, []);
   if (editId) {
     const idx = custom.findIndex(e => e.id === editId);
     if (idx >= 0) {
-      custom[idx] = { ...custom[idx], name, groups, group: groups[0],
-        imageData: imageData !== null ? imageData : custom[idx].imageData };
+      const imageData = state._clearExImg ? null : (newImageData || custom[idx].imageData);
+      state._clearExImg = false;
+      custom[idx] = { ...custom[idx], name, groups, group: groups[0], imageData };
     }
   } else {
-    const ex = { id:'c_'+uid(), name, groups, group: groups[0], imageData };
+    const ex = { id:'c_'+uid(), name, groups, group: groups[0], imageData: newImageData };
     custom.push(ex);
     state.pickerSelected.push(ex.id);
   }
@@ -1402,6 +1434,7 @@ function startWorkout(planId, lockerNum) {
     exercises:(plan.exercises||[]).map(ex => {
       const lastArr = getLastSetsArray(ex.id);
       const fallback = { weight:'', reps:'' };
+      const dbEx = EXERCISE_DB.find(e => e.id === ex.id);
       const customEx = load('ft_custom_ex',[]).find(e => e.id === ex.id);
       return {
         exerciseId:ex.id, name:ex.name, group:ex.group||'',
@@ -1409,6 +1442,7 @@ function startWorkout(planId, lockerNum) {
         plannedSets:ex.sets||3, plannedReps:ex.reps||'8-12',
         seatPos: ex.seatPos || null,
         chestSupport: ex.chestSupport || null,
+        gif: dbEx?.gif || null,
         imageData: customEx?.imageData || null,
         sets:Array.from({length:ex.sets||3}, (_,si) => {
           const prev = lastArr?.[si] || lastArr?.[lastArr.length-1] || fallback;
@@ -1457,7 +1491,8 @@ function renderWorkoutSession() {
           ${ex.chestSupport != null ? `<span style="font-size:11px;color:var(--text2);background:var(--card2);padding:2px 8px;border-radius:8px">${esc(ml.l2)}: <b>${esc(ex.chestSupport)}</b></span>` : ''}
         </div>` : '';
     const isRunEx = ex.group === 'Runs';
-    const exImage = ex.imageData ? `<img src="${ex.imageData}" style="width:100%;max-height:160px;object-fit:cover;border-radius:10px;margin-bottom:8px">` : '';
+    const imgSrc = ex.gif || ex.imageData || null;
+    const exImage = imgSrc ? `<img src="${imgSrc}" style="width:100%;max-height:180px;object-fit:contain;border-radius:10px;margin-bottom:8px;background:var(--card2)">` : '';
     const cardBody = isRunEx
       ? `<div style="padding:8px 0">
           ${ex.seatPos ? `<div style="font-size:13px;color:var(--text2);margin-bottom:8px">Ziel: <b>${esc(ex.seatPos)} km</b></div>` : ''}
