@@ -1549,6 +1549,9 @@ function renderWorkoutSession() {
         ${isRunEx ? '' : `<button class="icon-btn" style="color:var(--text3);padding:4px" title="Maschineneinstellung" onclick="openMachineSettings(${ei})">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>
         </button>`}
+        <button class="icon-btn" style="color:var(--danger);padding:4px" title="Übung entfernen" onclick="removeWorkoutEx(${ei})">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
+        </button>
       </div>
       ${cardBody}
     </div>`;
@@ -1572,7 +1575,10 @@ function renderWorkoutSession() {
           <button class="btn btn-primary btn-sm" onclick="finishWorkout()">${t('finish_workout')}</button>
         </div>
       </div>
-      <div class="workout-exercises" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px">${exHtml}</div>
+      <div class="workout-exercises" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px">
+        ${exHtml}
+        <button class="btn btn-secondary btn-full" style="margin-top:8px" onclick="openAddWorkoutEx()">+ Übung hinzufügen</button>
+      </div>
     </div>`);
   startTimer(aw.startTime);
 }
@@ -1611,8 +1617,103 @@ function addSet(ei) {
 }
 function delSet(ei, si) {
   const aw = state.activeWorkout; if (!aw) return;
-  if (aw.exercises[ei].sets.length <= 1) { showToast('Need at least 1 set'); return; }
+  if (aw.exercises[ei].sets.length <= 1) { showToast(t('min_set')); return; }
   aw.exercises[ei].sets.splice(si, 1); save(SK.ACTIVE_WO, aw); renderWorkoutSession();
+}
+
+function removeWorkoutEx(ei) {
+  const aw = state.activeWorkout; if (!aw) return;
+  const name = aw.exercises[ei]?.name || 'Übung';
+  openOverlay(`
+    <div style="text-align:center;display:flex;flex-direction:column;gap:14px">
+      <p style="margin:0;font-size:15px">„${esc(name)}" aus dem Training entfernen?</p>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-secondary" style="flex:1" onclick="closeOverlay()">Abbrechen</button>
+        <button class="btn btn-danger" style="flex:1" onclick="closeOverlay();confirmRemoveWorkoutEx(${ei})">Entfernen</button>
+      </div>
+    </div>`, 'Übung entfernen');
+}
+
+function confirmRemoveWorkoutEx(ei) {
+  const aw = state.activeWorkout; if (!aw) return;
+  aw.exercises.splice(ei, 1);
+  save(SK.ACTIVE_WO, aw);
+  renderWorkoutSession();
+}
+
+function openAddWorkoutEx() {
+  const aw = state.activeWorkout; if (!aw) return;
+  state._addingToWorkout = true;
+  state.exPickerGroup = 'All';
+  state.exPickerSearch = '';
+  const allEx = getAllExercises();
+  const alreadyIn = new Set(aw.exercises.map(e => e.exerciseId));
+  const groups = ['All', ...new Set(allEx.map(e => e.group))];
+  const filtered = allEx.filter(e =>
+    (state.exPickerGroup === 'All' || e.group === state.exPickerGroup) &&
+    (!state.exPickerSearch || e.name.toLowerCase().includes(state.exPickerSearch.toLowerCase()))
+  );
+  renderAddWorkoutExPicker();
+}
+
+function renderAddWorkoutExPicker() {
+  const aw = state.activeWorkout; if (!aw) return;
+  const allEx = getAllExercises();
+  const alreadyIn = new Set(aw.exercises.map(e => e.exerciseId));
+  const groups = ['All', ...new Set(allEx.map(e => e.group))];
+  const filtered = allEx.filter(e =>
+    (state.exPickerGroup === 'All' || e.group === state.exPickerGroup) &&
+    (!state.exPickerSearch || e.name.toLowerCase().includes(state.exPickerSearch.toLowerCase()))
+  );
+  const groupTabs = groups.map(g => {
+    const active = state.exPickerGroup === g;
+    const bg = active ? (GROUP_COLORS[g] || 'var(--accent)') : '';
+    return `<button class="ex-group-btn${active?' active':''}" style="${active?`background:${bg};border-color:${bg}`:''}" onclick="state.exPickerGroup='${g}';renderAddWorkoutExPicker()">${g}</button>`;
+  }).join('');
+  const rows = filtered.map(e => {
+    const col = GROUP_COLORS[e.group] || '#888';
+    const abbr = e.group.substring(0,2).toUpperCase();
+    const already = alreadyIn.has(e.id);
+    const gifThumb = e.gif
+      ? `<img src="${e.gif}" style="width:44px;height:44px;object-fit:cover;border-radius:6px;flex-shrink:0">`
+      : `<div class="ex-badge" style="background:${col};flex-shrink:0">${abbr}</div>`;
+    return `<div class="ex-row${already?' selected':''}" onclick="${already?'':'addExToWorkout(\''+e.id+'\')'}">
+      ${gifThumb}
+      <div style="flex:1;min-width:0"><div class="ex-row-name">${esc(e.name)}</div><div class="ex-row-group">${esc(e.group)}</div></div>
+      <div style="font-size:11px;color:${already?'var(--accent)':'var(--text3)'};">${already?'✓ dabei':''}</div>
+    </div>`;
+  }).join('');
+  openOverlay(`
+    <input class="input" type="search" placeholder="${t('search')}" value="${esc(state.exPickerSearch)}"
+      oninput="state.exPickerSearch=this.value;renderAddWorkoutExPicker()" style="margin-bottom:10px">
+    <div class="ex-picker-groups" style="margin-bottom:10px">${groupTabs}</div>
+    <div class="ex-list">${rows || '<div style="text-align:center;padding:20px;color:var(--text2)">${t(\'no_ex_found\')}</div>'}</div>
+  `, '+ Übung hinzufügen');
+}
+
+function addExToWorkout(exId) {
+  const aw = state.activeWorkout; if (!aw) return;
+  const ex = getAllExercises().find(e => e.id === exId); if (!ex) return;
+  const dbEx = EXERCISE_DB.find(e => e.id === exId);
+  const customEx = load(SK.CUSTOM_EX, []).find(e => e.id === exId);
+  const lastArr = getLastSetsArray(exId);
+  const fallback = { weight:'', reps:'' };
+  aw.exercises.push({
+    exerciseId: ex.id, name: ex.name, group: ex.group||'',
+    groups: ex.groups || [ex.group],
+    plannedSets: 3, plannedReps: '8-12',
+    seatPos: null, chestSupport: null,
+    gif: dbEx?.gif || null,
+    imageData: customEx?.imageData || null,
+    sets: Array.from({length:3}, (_,si) => {
+      const prev = lastArr?.[si] || lastArr?.[lastArr.length-1] || fallback;
+      return { weight: prev.weight, reps: prev.reps, done: false };
+    }),
+  });
+  save(SK.ACTIVE_WO, aw);
+  closeOverlay();
+  renderWorkoutSession();
+  showToast(`${esc(ex.name)} hinzugefügt!`);
 }
 function openMachineSettings(ei) {
   const aw = state.activeWorkout; if (!aw) return;
