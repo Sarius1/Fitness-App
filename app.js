@@ -2869,9 +2869,9 @@ function renderAnalytics() {
     <div class="section-hd"><span class="section-title">This Week</span></div>
     <div class="stats-grid">
       <div class="stat-card"><div class="stat-icon">🏋️</div><div><span class="stat-val">${woWeek}</span></div><div class="stat-lbl">Workouts</div></div>
-      <div class="stat-card"><div class="stat-icon">🏃</div><div><span class="stat-val">${runWeek.toFixed(1)}</span><span class="stat-unit">km</span></div><div class="stat-lbl">Running</div></div>
-      <div class="stat-card"><div class="stat-icon">🔥</div><div><span class="stat-val">${avgCal}</span><span class="stat-unit">kcal</span></div><div class="stat-lbl">Avg Calories</div></div>
-      <div class="stat-card"><div class="stat-icon">🥩</div><div><span class="stat-val">${avgPro}</span><span class="stat-unit">g</span></div><div class="stat-lbl">Avg Protein</div></div>
+      ${showRunning()?`<div class="stat-card"><div class="stat-icon">🏃</div><div><span class="stat-val">${runWeek.toFixed(1)}</span><span class="stat-unit">km</span></div><div class="stat-lbl">Running</div></div>`:''}
+      ${getTrackedMacros().includes('calories')?`<div class="stat-card"><div class="stat-icon">🔥</div><div><span class="stat-val">${avgCal}</span><span class="stat-unit">kcal</span></div><div class="stat-lbl">${t('avg_calories')}</div></div>`:''}
+      ${getTrackedMacros().includes('protein')?`<div class="stat-card"><div class="stat-icon">🥩</div><div><span class="stat-val">${avgPro}</span><span class="stat-unit">g</span></div><div class="stat-lbl">${t('avg_protein')}</div></div>`:''}
     </div>
 
     <div class="chart-card" style="padding:0;overflow:hidden;margin-top:10px">
@@ -3244,7 +3244,7 @@ function showOnboarding() {
   const macroLabels = {calories:'Kalorien',protein:'Protein',carbs:'Kohlenhydrate',fat:'Fett'};
   function chip(key, label, active, group) {
     const col = group==='feature'?'#6c63ff':'var(--accent)';
-    return `<button type="button" data-key="${key}" data-group="${group}"
+    return `<button type="button" data-key="${key}" data-group="${group}" data-active="${active?'1':'0'}"
       onclick="obToggle(this,'${key}','${group}')"
       style="padding:9px 16px;border-radius:12px;border:2px solid ${active?col:'var(--border)'};background:${active?col+'18':'transparent'};color:${active?col:'var(--text2)'};font-size:14px;font-weight:600;cursor:pointer;transition:all .15s">${label}</button>`;
   }
@@ -3290,12 +3290,11 @@ function showOnboarding() {
 
 function obToggle(btn, key, group) {
   const col = group==='feature'?'#6c63ff':'var(--accent)';
-  const active = btn.style.borderColor === col || btn.style.background.includes(col.replace('#',''));
-  const nowActive = !active;
+  const nowActive = btn.dataset.active !== '1';
+  btn.dataset.active    = nowActive ? '1' : '0';
   btn.style.borderColor = nowActive ? col : 'var(--border)';
   btn.style.background  = nowActive ? col+'18' : 'transparent';
   btn.style.color       = nowActive ? col : 'var(--text2)';
-  // Show/hide related goal fields
   if (group === 'macro') {
     const field = document.querySelector(`.ob-goal-field[data-macro="${key}"]`);
     if (field) field.style.display = nowActive ? '' : 'none';
@@ -3307,12 +3306,9 @@ function obToggle(btn, key, group) {
 }
 
 function finishOnboarding() {
-  const trackedMacros = ALL_MACROS.filter(m => {
-    const btn = document.querySelector(`[data-key="${m}"]`);
-    return btn && btn.style.borderColor !== 'var(--border)' && !btn.style.borderColor.includes('128,128');
-  });
-  const showRunningOn = (() => { const b = document.querySelector('[data-key="showRunning"]'); return b && b.style.borderColor !== 'var(--border)'; })();
-  const showStepsOn   = (() => { const b = document.querySelector('[data-key="showSteps"]');   return b && b.style.borderColor !== 'var(--border)'; })();
+  const trackedMacros = ALL_MACROS.filter(m => document.querySelector(`[data-key="${m}"]`)?.dataset.active === '1');
+  const showRunningOn = document.querySelector('[data-key="showRunning"]')?.dataset.active === '1';
+  const showStepsOn   = document.querySelector('[data-key="showSteps"]')?.dataset.active   === '1';
   const goals = {
     calories: parseFloat(document.getElementById('ob_calories')?.value) || 2500,
     protein:  parseFloat(document.getElementById('ob_protein')?.value)  || 150,
