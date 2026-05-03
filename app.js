@@ -1131,18 +1131,10 @@ function renderPlanExList(planId, mode) {
          <input type="text" placeholder="–" id="ms_chest_${id}" value="${esc(ms.chestSupport||'')}"
            style="width:42px;font-size:12px;padding:2px 5px;background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text1);text-align:center"
            onchange="(state.pickerMachineSettings['${id}']||(state.pickerMachineSettings['${id}']={})).chestSupport=this.value.trim()||null">`;
-    return `<div data-drag-idx="${i}" draggable="true"
-      ondragstart="exDragStart(event,${i})"
-      ondragover="exDragOver(event,${i})"
-      ondrop="exDrop(event,${i},'${pid}','${md}')"
-      ondragend="exDragEnd()"
-      style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);transition:background .15s">
-      <div class="drag-handle" touch-action="none"
-        onpointerdown="exPointerDown(event,${i})"
-        style="cursor:grab;padding:4px 6px;color:var(--text3);flex-shrink:0;touch-action:none;user-select:none">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="14" x2="20" y2="14"/><line x1="4" y1="20" x2="20" y2="20"/>
-        </svg>
+    return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;flex-direction:column;gap:2px;flex-shrink:0">
+        <button onclick="exMove(${i},-1,'${pid}','${md}')" ${i===0?'disabled':''} style="background:none;border:none;cursor:pointer;padding:2px 6px;color:${i===0?'var(--border)':'var(--text2)'};font-size:14px;line-height:1">▲</button>
+        <button onclick="exMove(${i}, 1,'${pid}','${md}')" ${i===state.pickerSelected.length-1?'disabled':''} style="background:none;border:none;cursor:pointer;padding:2px 6px;color:${i===state.pickerSelected.length-1?'var(--border)':'var(--text2)'};font-size:14px;line-height:1">▼</button>
       </div>
       <div style="width:26px;height:26px;border-radius:6px;background:${col};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff;flex-shrink:0">${ex.group.substring(0,2).toUpperCase()}</div>
       <div style="flex:1;min-width:0">
@@ -1180,59 +1172,10 @@ function _doExReorder(fromIdx, toIdx, planId, mode) {
   else openNewPlan(true);
 }
 
-// ── HTML5 Drag (desktop) ──────────────────────────────────
-function exDragStart(e, idx) {
-  state._dragIdx = idx;
-  e.dataTransfer.effectAllowed = 'move';
-}
-function exDragOver(e, idx) {
-  e.preventDefault();
-  e.dataTransfer.dropEffect = 'move';
-  document.querySelectorAll('[data-drag-idx]').forEach(r => r.style.background = '');
-  const el = document.querySelector(`[data-drag-idx="${idx}"]`);
-  if (el) el.style.background = 'var(--accent)18';
-}
-function exDrop(e, toIdx, planId, mode) {
-  e.preventDefault();
-  document.querySelectorAll('[data-drag-idx]').forEach(r => r.style.background = '');
-  _doExReorder(state._dragIdx, toIdx, planId, mode);
-}
-function exDragEnd() {
-  document.querySelectorAll('[data-drag-idx]').forEach(r => r.style.background = '');
-  state._dragIdx = null;
-}
-
-// ── Touch/Pointer drag (mobile) ───────────────────────────
-function exPointerDown(e, idx) {
-  if (e.pointerType === 'mouse') return; // handled by HTML5 drag
-  e.currentTarget.setPointerCapture(e.pointerId);
-  state._dragIdx   = idx;
-  state._dragMoved = false;
-  e.currentTarget.addEventListener('pointermove', _exPointerMove);
-  e.currentTarget.addEventListener('pointerup',   _exPointerUp);
-}
-function _exPointerMove(e) {
-  state._dragMoved = true;
-  const el = document.elementFromPoint(e.clientX, e.clientY);
-  const row = el?.closest('[data-drag-idx]');
-  document.querySelectorAll('[data-drag-idx]').forEach(r => r.style.background = '');
-  if (row) {
-    row.style.background = 'var(--accent)18';
-    state._dragHoverIdx = parseInt(row.dataset.dragIdx);
-  }
-}
-function _exPointerUp(e) {
-  e.currentTarget.removeEventListener('pointermove', _exPointerMove);
-  e.currentTarget.removeEventListener('pointerup',   _exPointerUp);
-  document.querySelectorAll('[data-drag-idx]').forEach(r => r.style.background = '');
-  if (state._dragMoved && state._dragHoverIdx !== undefined && state._dragHoverIdx !== state._dragIdx) {
-    const row = document.querySelector(`[data-drag-idx="${state._dragIdx}"]`);
-    const planId = row?.closest('[data-plan-id]')?.dataset.planId || null;
-    const mode   = row?.closest('[data-plan-mode]')?.dataset.planMode || 'new';
-    _doExReorder(state._dragIdx, state._dragHoverIdx, planId, mode);
-  }
-  state._dragIdx = state._dragHoverIdx = null;
-  state._dragMoved = false;
+function exMove(idx, dir, planId, mode) {
+  const toIdx = idx + dir;
+  if (toIdx < 0 || toIdx >= state.pickerSelected.length) return;
+  _doExReorder(idx, toIdx, planId, mode);
 }
 
 function openNewPlan(preserveSelection = false) {
