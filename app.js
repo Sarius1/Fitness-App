@@ -354,6 +354,20 @@ function barColor(pct) {
 }
 const barHex = cls => ({ 'prog-bar-green':'#22c55e','prog-bar-yellow':'#f59e0b','prog-bar-red':'#ef4444','prog-bar-over':'#f97316' })[cls] || '#888';
 
+function getWorkoutDayColor(dateStr, sd, hist, todayDate) {
+  if (!sd) return null;
+  // Custom override with user-chosen color
+  if (sd.isOverride && sd.color) return sd.color;
+  // Plan day: check if workout was done
+  if (sd.type === 'plan' && sd.planId) {
+    const done = hist.some(w => w.date === dateStr && w.planId === sd.planId);
+    if (done) return '#22c55e';
+    if (dateStr < todayDate) return '#ef4444'; // past day, missed
+    return null; // future day, no color yet
+  }
+  return null;
+}
+
 function renderNutrition() {
   const el = document.getElementById('tab-nutrition');
   const { y, m } = state.nutritionMonth;
@@ -364,6 +378,7 @@ function renderNutrition() {
 
   const suppls = getSupplements();
   const supplLog = suppls.length ? getSupplLog() : {};
+  const hist = getHistory();
   let cells = ['Su','Mo','Tu','We','Th','Fr','Sa'].map(d=>`<div class="cal-dow">${d}</div>`).join('');
   for (let i = 0; i < firstDOW; i++) cells += `<div class="cal-day empty"></div>`;
   for (let d = 1; d <= days; d++) {
@@ -385,7 +400,9 @@ function renderNutrition() {
           `<svg viewBox="0 0 8 8" width="6" height="6"><polyline points="1,4 3,6 7,2" stroke="#22c55e" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`
         ).join('')}</div>`
       : '';
-    cells += `<div class="cal-day${ds===t_today?' today':''}" onclick="openDayView('${ds}')">
+    // Workout completion color
+    const wsColor = getWorkoutDayColor(ds, sd, hist, t_today);
+    cells += `<div class="cal-day${ds===t_today?' today':''}" onclick="openDayView('${ds}')" style="${wsColor?`border:2px solid ${wsColor};background:${wsColor}12;border-radius:8px`:''}">
       <div class="cal-day-num">${d}</div>
       ${sdBadge}
       <div class="cal-mini-bars">
@@ -965,11 +982,11 @@ function openActivityOverride(dateStr) {
   `, 'Activity for ' + fmtShort(dateStr));
 }
 
-function setDayActivity(dateStr, type, planId, label) {
+function setDayActivity(dateStr, type, planId, label, color) {
   const resolvedLabel = label || (type === 'plan' ? (getPlans().find(p=>p.id===planId)?.name || 'Workout') : type === 'run' ? 'Run' : 'Rest');
   const data = getNutritionData();
   if (!data[dateStr]) data[dateStr] = { foods: [] };
-  data[dateStr].activityOverride = { type, planId: planId||'', label: resolvedLabel };
+  data[dateStr].activityOverride = { type, planId: planId||'', label: resolvedLabel, color: color||null };
   save(SK.NUTRITION, data);
   closeOverlay();
   openDayView(dateStr);
@@ -977,14 +994,29 @@ function setDayActivity(dateStr, type, planId, label) {
 }
 
 function openCustomDayActivity(dateStr) {
+  const colors = ['#22c55e','#ef4444','#f59e0b','#3b82f6','#8b5cf6','#ec4899','#14b8a6','#f97316','#6b7280'];
   closeOverlay();
   openOverlay(`
     <div class="input-group">
-      <label class="input-label">Activity Name</label>
-      <input class="input" id="ca_label" type="text" placeholder="e.g. Yoga, Cycling, Mobility…">
+      <label class="input-label">Name</label>
+      <input class="input" id="ca_label" type="text" placeholder="z.B. Yoga, Radfahren…">
     </div>
-    <button class="btn btn-primary btn-full mt-8" onclick="setDayActivity('${dateStr}','custom','',document.getElementById('ca_label')?.value||'Custom')">Set Activity</button>
-  `, 'Custom Activity');
+    <div class="input-group">
+      <label class="input-label">Farbe im Kalender</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+        ${colors.map((c,i) => `<button type="button" data-color="${c}" onclick="selectCustomDayColor(this)"
+          style="width:32px;height:32px;border-radius:50%;background:${c};border:3px solid ${i===0?'#fff':'transparent'};cursor:pointer;transition:border .15s"></button>`).join('')}
+      </div>
+    </div>
+    <button class="btn btn-primary btn-full mt-8" onclick="setDayActivity('${dateStr}','custom','',document.getElementById('ca_label')?.value||'Custom',state._customDayColor||'#22c55e')">Speichern</button>
+  `, 'Eigene Aktivität');
+  state._customDayColor = colors[0];
+}
+
+function selectCustomDayColor(btn) {
+  document.querySelectorAll('[data-color]').forEach(b => b.style.borderColor = 'transparent');
+  btn.style.borderColor = '#fff';
+  state._customDayColor = btn.dataset.color;
 }
 
 function clearDayActivity(dateStr) {
