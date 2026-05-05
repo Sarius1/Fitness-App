@@ -378,7 +378,8 @@ function renderNutrition() {
     const sdCol = sd ? splitDayColor(sd) : null;
     const sdBadge = sd ? `<div class="cal-split-badge" style="background:${sdCol}22;color:${sdCol}">${esc(sd.label)}</div>` : '';
     const daySupplLog = supplLog[ds] || {};
-    const takenSuppl = suppls.filter(s => daySupplLog[s.id]);
+    const dsDow = parseDate(ds).getDay();
+    const takenSuppl = suppls.filter(s => (!s.days?.length || s.days.includes(dsDow)) && daySupplLog[s.id]);
     const supplDots = takenSuppl.length
       ? `<div style="display:flex;gap:1px;flex-wrap:wrap;margin-top:2px">${takenSuppl.map(() =>
           `<svg viewBox="0 0 8 8" width="6" height="6"><polyline points="1,4 3,6 7,2" stroke="#22c55e" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`
@@ -723,17 +724,49 @@ function openAddSupplementModal() {
         <label class="input-label">${t('dosage')}</label>
         <input class="input" id="suppl_dose" type="text" placeholder="z.B. 1000 IE, 2 Kapseln">
       </div>
+      <div class="input-group">
+        <label class="input-label">Im Kalender anzeigen an</label>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:6px">Leer lassen = täglich</div>
+        <div style="display:flex;gap:6px">${dowChips([], 'suppl_days')}</div>
+      </div>
+      <div style="border-top:1px solid var(--border);padding-top:12px">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+          <input type="checkbox" id="suppl_reminder_on" onchange="document.getElementById('suppl_reminder_fields').style.display=this.checked?'flex':'none'" style="width:18px;height:18px;accent-color:var(--accent)">
+          <span style="font-size:14px;font-weight:600">Erinnerung erstellen</span>
+        </label>
+        <div id="suppl_reminder_fields" style="display:none;flex-direction:column;gap:10px;margin-top:10px">
+          <div class="input-group">
+            <label class="input-label">Uhrzeit</label>
+            <input class="input" id="suppl_rem_time" type="time" value="08:00">
+          </div>
+          <div class="input-group">
+            <label class="input-label">Wochentage (leer = täglich)</label>
+            <div style="display:flex;gap:6px;margin-top:6px">${dowChips([], 'suppl_rem_days')}</div>
+          </div>
+        </div>
+      </div>
       <button class="btn btn-primary btn-full" onclick="saveNewSupplement()">Speichern</button>
     </div>`, t('add_supplement'));
 }
 
 function saveNewSupplement() {
   const name = document.getElementById('suppl_name')?.value.trim();
-  if (!name) { showToast('Name eingeben'); return; }
+  if (!name) { showToast(t('enter_name')); return; }
   const dose = document.getElementById('suppl_dose')?.value.trim() || null;
+  const days = getSelectedDows('suppl_days');
   const suppl = getSupplements();
-  suppl.push({ id: uid(), name, dose });
+  const newId = uid();
+  suppl.push({ id: newId, name, dose, days });
   save(SK.SUPPLEMENTS, suppl);
+  // Optional reminder
+  if (document.getElementById('suppl_reminder_on')?.checked) {
+    const time = document.getElementById('suppl_rem_time')?.value || '08:00';
+    const remDays = getSelectedDows('suppl_rem_days');
+    const rems = getReminders();
+    rems.push({ id: uid(), text: name + (dose ? ` (${dose})` : ''), time, days: remDays, enabled: true, supplId: newId });
+    save(SK.REMINDERS, rems);
+    if (Notification?.permission === 'default') Notification.requestPermission().catch(()=>{});
+  }
   closeOverlay();
   renderNutrition();
   showToast(t('supplement_saved'));
@@ -744,11 +777,18 @@ function deleteSupplement(id) {
   const log = getSupplLog();
   Object.keys(log).forEach(ds => { delete log[ds][id]; });
   save(SK.SUPPL_LOG, log);
+  // Remove linked reminders
+  save(SK.REMINDERS, getReminders().filter(r => r.supplId !== id));
   renderNutrition();
 }
 
+function supplForDay(dateStr) {
+  const dow = parseDate(dateStr).getDay();
+  return getSupplements().filter(s => !s.days?.length || s.days.includes(dow));
+}
+
 function renderDaySupplements(dateStr) {
-  const suppl = getSupplements();
+  const suppl = supplForDay(dateStr);
   if (!suppl.length) return '';
   const log = getSupplLog();
   const taken = log[dateStr] || {};
@@ -1550,7 +1590,11 @@ function renderWorkoutSession() {
         <div class="ex-badge" style="background:${col};width:32px;height:32px;border-radius:8px;font-size:10px">${abbr}</div>
         <span class="workout-ex-name">${esc(ex.name)}</span>
         <span class="workout-ex-prev">${isRunEx ? '' : prev}</span>
-        ${isRunEx ? '' : `<button class="icon-btn" style="color:var(--text3);padding:4px" title="Maschineneinstellung" onclick="openMachineSettings(${ei})">
+        ${isRunEx ? '' : `
+        <button class="icon-btn" style="color:var(--text3);padding:4px" title="Verlauf" onclick="openExHistory(${ei})">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="12 8 12 12 14 14"/><path d="M3.05 11a9 9 0 1 1 .5 4"/><polyline points="3 16 3 11 8 11"/></svg>
+        </button>
+        <button class="icon-btn" style="color:var(--text3);padding:4px" title="Maschineneinstellung" onclick="openMachineSettings(${ei})">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>
         </button>`}
         <button class="icon-btn" style="color:var(--danger);padding:4px" title="Übung entfernen" onclick="removeWorkoutEx(${ei})">
@@ -1636,6 +1680,41 @@ function removeWorkoutEx(ei) {
         <button class="btn btn-danger" style="flex:1" onclick="closeOverlay();confirmRemoveWorkoutEx(${ei})">Entfernen</button>
       </div>
     </div>`, 'Übung entfernen');
+}
+
+function openExHistory(ei) {
+  const aw = state.activeWorkout; if (!aw) return;
+  const ex = aw.exercises[ei];
+  const hist = getHistory()
+    .filter(w => w.exercises?.some(e => e.exerciseId === ex.exerciseId || e.name === ex.name))
+    .slice(0, 8);
+  const histHtml = hist.length ? hist.map(w => {
+    const wEx = w.exercises.find(e => e.exerciseId === ex.exerciseId || e.name === ex.name);
+    const sets = (wEx?.sets || []).filter(s => s.weight || s.reps);
+    return `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="font-size:12px;color:var(--text3);font-weight:600;margin-bottom:6px">${fmtShort(w.date)}</div>
+      ${sets.map((s,i) => `<div style="display:flex;gap:10px;font-size:14px;padding:3px 0;align-items:center">
+        <span style="color:var(--text3);min-width:18px;font-size:12px">${i+1}</span>
+        <span style="font-weight:700">${s.weight||'–'} kg</span>
+        <span style="color:var(--text3)">×</span>
+        <span style="font-weight:700">${s.reps||'–'}</span>
+        ${s.done?'<span style="color:var(--accent);font-size:11px">✓</span>':''}
+      </div>`).join('')}
+    </div>`;
+  }).join('')
+  : `<div style="text-align:center;padding:30px;color:var(--text3)">Noch keine Einträge</div>`;
+
+  openOverlay(`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div>
+        <div style="font-size:16px;font-weight:700">${esc(ex.name)}</div>
+        <div style="font-size:12px;color:var(--text3)">Letzte ${hist.length} Sessions</div>
+      </div>
+      <button class="icon-btn" style="color:var(--text2);padding:6px" onclick="closeOverlay()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="22" height="22"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    ${histHtml}`, '');
 }
 
 function confirmRemoveWorkoutEx(ei) {
@@ -3437,34 +3516,61 @@ function saveSettingsField(key, value) {
   const s = load(SK.SETTINGS, {}); s[key] = value; save(SK.SETTINGS, s);
 }
 
-function openAddReminderModal() {
+const DOW = [{d:1,l:'Mo'},{d:2,l:'Di'},{d:3,l:'Mi'},{d:4,l:'Do'},{d:5,l:'Fr'},{d:6,l:'Sa'},{d:0,l:'So'}];
+
+function dowChips(selectedDays = [], inputId = 'rem_days') {
+  return DOW.map(({d,l}) => {
+    const on = selectedDays.includes(d);
+    return `<button type="button" data-day="${d}" data-input="${inputId}" onclick="toggleDowChip(this)"
+      style="width:36px;height:36px;border-radius:50%;border:2px solid ${on?'var(--accent)':'var(--border)'};background:${on?'var(--accent)':'transparent'};color:${on?'#fff':'var(--text2)'};font-size:12px;font-weight:700;cursor:pointer">${l}</button>`;
+  }).join('');
+}
+
+function toggleDowChip(btn) {
+  const on = btn.style.background.includes('var(--accent)') || btn.style.background === 'var(--accent)';
+  const nowOn = !on;
+  btn.style.background  = nowOn ? 'var(--accent)' : 'transparent';
+  btn.style.borderColor = nowOn ? 'var(--accent)' : 'var(--border)';
+  btn.style.color       = nowOn ? '#fff' : 'var(--text2)';
+}
+
+function getSelectedDows(inputId = 'rem_days') {
+  return [...document.querySelectorAll(`[data-input="${inputId}"]`)]
+    .filter(b => b.style.background === 'var(--accent)' || b.style.background.includes('var(--accent)'))
+    .map(b => parseInt(b.dataset.day));
+}
+
+function openAddReminderModal(prefillText = '', prefillTime = '17:00') {
   openOverlay(`
     <div style="display:flex;flex-direction:column;gap:12px">
       <div class="input-group">
         <label class="input-label">${t('reminder_text')}</label>
-        <input class="input" id="rem_text" type="text" placeholder="z.B. Kreatin nehmen">
+        <input class="input" id="rem_text" type="text" placeholder="z.B. Kreatin nehmen" value="${esc(prefillText)}">
       </div>
       <div class="input-group">
         <label class="input-label">${t('reminder_time')}</label>
-        <input class="input" id="rem_time" type="time" value="17:00">
+        <input class="input" id="rem_time" type="time" value="${prefillTime}">
+      </div>
+      <div class="input-group">
+        <label class="input-label">Wochentage (leer = täglich)</label>
+        <div style="display:flex;gap:6px;margin-top:6px">${dowChips([], 'rem_days')}</div>
       </div>
       <button class="btn btn-primary btn-full" onclick="saveReminder()">Speichern</button>
     </div>`, t('reminder_title'));
 }
 
-function saveReminder() {
+function saveReminder(extraData = {}) {
   const text = document.getElementById('rem_text')?.value.trim();
   const time = document.getElementById('rem_time')?.value;
   if (!text || !time) { showToast('Text und Uhrzeit eingeben'); return; }
+  const days = getSelectedDows('rem_days');
   const rems = getReminders();
-  rems.push({ id: uid(), text, time, enabled: true });
+  rems.push({ id: uid(), text, time, days, enabled: true, ...extraData });
   save(SK.REMINDERS, rems);
-  if (Notification.permission === 'default') {
-    Notification.requestPermission().catch(()=>{});
-  }
+  if (Notification?.permission === 'default') Notification.requestPermission().catch(()=>{});
   closeOverlay();
   openSettings();
-  showToast('Erinnerung gespeichert!');
+  showToast(t('reminder_saved'));
 }
 
 function deleteReminder(id) {
@@ -3485,13 +3591,14 @@ function checkReminders() {
   const current = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
   if (state._lastReminderMinute === current) return;
   state._lastReminderMinute = current;
+  const currentDay = now.getDay(); // 0=So,1=Mo,...,6=Sa
   reminders.forEach(r => {
-    if (r.time === current) {
-      if (Notification?.permission === 'granted') {
-        try { new Notification('FitTrack', { body: r.text, icon: './icon.svg' }); } catch {}
-      } else {
-        showToast('🔔 ' + r.text);
-      }
+    if (r.time !== current) return;
+    if (r.days?.length && !r.days.includes(currentDay)) return; // wrong day
+    if (Notification?.permission === 'granted') {
+      try { new Notification('FitTrack', { body: r.text, icon: './icon.svg' }); } catch {}
+    } else {
+      showToast('🔔 ' + r.text);
     }
   });
 }
