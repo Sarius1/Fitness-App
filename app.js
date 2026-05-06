@@ -356,14 +356,18 @@ const barHex = cls => ({ 'prog-bar-green':'#22c55e','prog-bar-yellow':'#f59e0b',
 
 function getWorkoutDayColor(dateStr, sd, hist, todayDate) {
   if (!sd) return null;
-  // Custom override with user-chosen color
   if (sd.isOverride && sd.color) return sd.color;
-  // Plan day: check if workout was done
   if (sd.type === 'plan' && sd.planId) {
     const done = hist.some(w => w.date === dateStr && w.planId === sd.planId);
     if (done) return '#22c55e';
-    if (dateStr < todayDate) return '#ef4444'; // past day, missed
-    return null; // future day, no color yet
+    if (dateStr < todayDate) return '#ef4444';
+    return null;
+  }
+  if (sd.type === 'rest') {
+    const data = getNutritionData()[dateStr];
+    if (data?.restDone) return '#22c55e';
+    if (dateStr < todayDate) return '#6b7280'; // past rest, neutral grey
+    return null;
   }
   return null;
 }
@@ -530,6 +534,7 @@ function openDayView(dateStr) {
           <div style="font-size:11px;color:var(--text2)">${sd.isOverride?'Custom for today':'Planned '+( sd.type==='plan'?'workout':sd.type)}</div>
         </div>
         ${sd.type==='plan'&&sd.planId?`<button class="btn btn-sm btn-primary" onclick="promptStartWorkout('${sd.planId}')">▶ Start</button>`:''}
+        ${sd.type==='rest'?(()=>{const done=getNutritionData()[dateStr]?.restDone;return`<button class="btn btn-sm ${done?'btn-primary':'btn-secondary'}" onclick="toggleRestDone('${dateStr}')">${done?'✓ Erholt':'Abhaken'}</button>`;})():''}
         <button class="btn btn-sm btn-secondary" onclick="openActivityOverride('${dateStr}')">Change</button>
         ${sd.isOverride?`<button class="icon-btn" style="color:var(--text3)" onclick="clearDayActivity('${dateStr}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>`:''}
       </div>`
@@ -730,6 +735,11 @@ function deleteRepeatMeal(id) {
 }
 
 /* ── Supplements ────────────────────────────────────────── */
+function schedModeBtn(mode, label, prefix, active) {
+  return `<button type="button" data-schedmode="${prefix}" data-mode="${mode}" onclick="setScheduleMode('${mode}','${prefix}')"
+    style="flex:1;padding:7px;border:none;border-radius:9px;font-size:12px;font-weight:600;cursor:pointer;background:${active?'var(--accent)':'var(--card2)'};color:${active?'#fff':'var(--text2)'}">${label}</button>`;
+}
+
 function openAddSupplementModal() {
   openOverlay(`
     <div style="display:flex;flex-direction:column;gap:12px">
@@ -742,9 +752,19 @@ function openAddSupplementModal() {
         <input class="input" id="suppl_dose" type="text" placeholder="z.B. 1000 IE, 2 Kapseln">
       </div>
       <div class="input-group">
-        <label class="input-label">Im Kalender anzeigen an</label>
-        <div style="font-size:11px;color:var(--text3);margin-bottom:6px">Leer lassen = täglich</div>
-        <div style="display:flex;gap:6px">${dowChips([], 'suppl_days')}</div>
+        <label class="input-label">Zeitplan</label>
+        <div style="display:flex;gap:4px;background:var(--card);border-radius:10px;padding:3px;margin-bottom:10px">
+          ${schedModeBtn('daily','Täglich','suppl',true)}
+          ${schedModeBtn('weekdays','Wochentage','suppl',false)}
+          ${schedModeBtn('rhythm','Rhythmus','suppl',false)}
+        </div>
+        <div id="suppl_daily"></div>
+        <div id="suppl_weekdays" style="display:none">
+          <div style="display:flex;gap:6px">${dowChips([],'suppl_days')}</div>
+        </div>
+        <div id="suppl_rhythm" style="display:none">
+          ${rhythmBuilderHtml('suppl_rhythm_pat','suppl_rhythm_start')}
+        </div>
       </div>
       <div style="border-top:1px solid var(--border);padding-top:12px">
         <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
@@ -757,8 +777,19 @@ function openAddSupplementModal() {
             <input class="input" id="suppl_rem_time" type="time" value="08:00">
           </div>
           <div class="input-group">
-            <label class="input-label">Wochentage (leer = täglich)</label>
-            <div style="display:flex;gap:6px;margin-top:6px">${dowChips([], 'suppl_rem_days')}</div>
+            <label class="input-label">Erinnerungs-Zeitplan</label>
+            <div style="display:flex;gap:4px;background:var(--card);border-radius:10px;padding:3px;margin-bottom:8px">
+              ${schedModeBtn('daily','Täglich','remschedule',true)}
+              ${schedModeBtn('weekdays','Wochentage','remschedule',false)}
+              ${schedModeBtn('rhythm','Rhythmus','remschedule',false)}
+            </div>
+            <div id="remschedule_daily"></div>
+            <div id="remschedule_weekdays" style="display:none">
+              <div style="display:flex;gap:6px">${dowChips([],'suppl_rem_days')}</div>
+            </div>
+            <div id="remschedule_rhythm" style="display:none">
+              ${rhythmBuilderHtml('suppl_rem_rhythm_pat','suppl_rem_rhythm_start')}
+            </div>
           </div>
         </div>
       </div>
@@ -770,23 +801,29 @@ function saveNewSupplement() {
   const name = document.getElementById('suppl_name')?.value.trim();
   if (!name) { showToast(t('enter_name')); return; }
   const dose = document.getElementById('suppl_dose')?.value.trim() || null;
-  const days = getSelectedDows('suppl_days');
+  // Determine supplement schedule
+  const supplMode = document.querySelector('[data-schedmode="suppl"][style*="var(--accent)"]')?.dataset.mode || 'daily';
+  const days = supplMode==='weekdays' ? getSelectedDows('suppl_days') : [];
+  const rhythmPattern = supplMode==='rhythm' ? getRhythmPattern('suppl_rhythm_pat') : null;
+  const rhythmStart   = supplMode==='rhythm' ? (document.getElementById('suppl_rhythm_start')?.value||todayStr()) : null;
   const suppl = getSupplements();
   const newId = uid();
-  suppl.push({ id: newId, name, dose, days });
+  suppl.push({ id:newId, name, dose, days, rhythmPattern, rhythmStart });
   save(SK.SUPPLEMENTS, suppl);
   // Optional reminder
   if (document.getElementById('suppl_reminder_on')?.checked) {
     const time = document.getElementById('suppl_rem_time')?.value || '08:00';
-    const remDays = getSelectedDows('suppl_rem_days');
+    const remMode = document.querySelector('[data-schedmode="remschedule"][style*="var(--accent)"]')?.dataset.mode || 'daily';
+    const remDays = remMode==='weekdays' ? getSelectedDows('suppl_rem_days') : [];
+    const remRhythm = remMode==='rhythm' ? getRhythmPattern('suppl_rem_rhythm_pat') : null;
+    const remRhythmStart = remMode==='rhythm' ? (document.getElementById('suppl_rem_rhythm_start')?.value||todayStr()) : null;
     const rems = getReminders();
-    rems.push({ id: uid(), text: name + (dose ? ` (${dose})` : ''), time, days: remDays, enabled: true, supplId: newId });
+    rems.push({ id:uid(), text:name+(dose?` (${dose})`:''), time, days:remDays,
+      rhythmPattern:remRhythm, rhythmStart:remRhythmStart, enabled:true, supplId:newId });
     save(SK.REMINDERS, rems);
-    if (Notification?.permission === 'default') Notification.requestPermission().catch(()=>{});
+    if (Notification?.permission==='default') Notification.requestPermission().catch(()=>{});
   }
-  closeOverlay();
-  renderNutrition();
-  showToast(t('supplement_saved'));
+  closeOverlay(); renderNutrition(); showToast(t('supplement_saved'));
 }
 
 function deleteSupplement(id) {
@@ -799,9 +836,76 @@ function deleteSupplement(id) {
   renderNutrition();
 }
 
+function isRhythmActive(pattern, startDate, dateStr) {
+  if (!pattern?.length) return true;
+  const diffMs = parseDate(dateStr) - parseDate(startDate);
+  const diffDays = Math.round(diffMs / 86400000);
+  if (diffDays < 0) return false;
+  return !!pattern[diffDays % pattern.length];
+}
+
+function isSupplActiveOnDate(s, dateStr) {
+  if (s.rhythmPattern?.length) return isRhythmActive(s.rhythmPattern, s.rhythmStart || dateStr, dateStr);
+  if (s.days?.length) return s.days.includes(parseDate(dateStr).getDay());
+  return true;
+}
+
 function supplForDay(dateStr) {
-  const dow = parseDate(dateStr).getDay();
-  return getSupplements().filter(s => !s.days?.length || s.days.includes(dow));
+  return getSupplements().filter(s => isSupplActiveOnDate(s, dateStr));
+}
+
+// ── Rhythm Builder UI helpers ─────────────────────────────
+function rhythmChip(active, idx, inputId) {
+  return `<button type="button" data-idx="${idx}" data-input="${inputId}" onclick="toggleRhythmChip(this)"
+    style="width:36px;height:36px;border-radius:8px;border:2px solid ${active?'#22c55e':'var(--border)'};background:${active?'#22c55e18':'transparent'};color:${active?'#22c55e':'var(--text3)'};font-size:13px;font-weight:700;cursor:pointer">${active?'J':'N'}</button>`;
+}
+
+function rhythmBuilderHtml(inputId, startId, pattern = [true,true,true,false]) {
+  const chips = pattern.map((a,i) => rhythmChip(a, i, inputId)).join('');
+  return `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:10px" id="${inputId}_chips">
+    ${chips}
+    <button type="button" onclick="addRhythmDay('${inputId}')" style="width:36px;height:36px;border-radius:8px;border:2px solid var(--border);background:transparent;color:var(--text2);font-size:20px;line-height:1;cursor:pointer">+</button>
+    <button type="button" onclick="removeRhythmDay('${inputId}')" style="width:36px;height:36px;border-radius:8px;border:2px solid var(--border);background:transparent;color:var(--text2);font-size:20px;line-height:1;cursor:pointer">−</button>
+  </div>
+  <div class="input-group">
+    <label class="input-label">Startdatum des Rhythmus</label>
+    <input class="input" type="date" id="${startId}" value="${todayStr()}">
+  </div>`;
+}
+
+function toggleRhythmChip(btn) {
+  const on = btn.textContent === 'J';
+  btn.textContent = on ? 'N' : 'J';
+  btn.style.borderColor = on ? 'var(--border)' : '#22c55e';
+  btn.style.background  = on ? 'transparent' : '#22c55e18';
+  btn.style.color       = on ? 'var(--text3)' : '#22c55e';
+}
+function addRhythmDay(inputId) {
+  const c = document.getElementById(inputId+'_chips');
+  const idx = c.querySelectorAll('[data-idx]').length;
+  const btn = document.createElement('button');
+  btn.type='button'; btn.dataset.idx=idx; btn.dataset.input=inputId;
+  btn.textContent='J'; btn.onclick=function(){toggleRhythmChip(this);};
+  btn.style.cssText='width:36px;height:36px;border-radius:8px;border:2px solid #22c55e;background:#22c55e18;color:#22c55e;font-size:13px;font-weight:700;cursor:pointer';
+  c.insertBefore(btn, c.querySelector('button:not([data-idx])'));
+}
+function removeRhythmDay(inputId) {
+  const chips = document.getElementById(inputId+'_chips').querySelectorAll('[data-idx]');
+  if (chips.length > 1) chips[chips.length-1].remove();
+}
+function getRhythmPattern(inputId) {
+  return [...document.querySelectorAll(`[data-input="${inputId}"][data-idx]`)].map(b => b.textContent==='J');
+}
+function setScheduleMode(mode, prefix) {
+  ['daily','weekdays','rhythm'].forEach(m => {
+    const el = document.getElementById(`${prefix}_${m}`);
+    if (el) el.style.display = m===mode ? '' : 'none';
+  });
+  document.querySelectorAll(`[data-schedmode="${prefix}"]`).forEach(b => {
+    const on = b.dataset.mode === mode;
+    b.style.background = on ? 'var(--accent)' : 'var(--card2)';
+    b.style.color = on ? '#fff' : 'var(--text2)';
+  });
 }
 
 function renderDaySupplements(dateStr) {
@@ -1017,6 +1121,14 @@ function selectCustomDayColor(btn) {
   document.querySelectorAll('[data-color]').forEach(b => b.style.borderColor = 'transparent');
   btn.style.borderColor = '#fff';
   state._customDayColor = btn.dataset.color;
+}
+
+function toggleRestDone(dateStr) {
+  const data = getNutritionData();
+  if (!data[dateStr]) data[dateStr] = { foods: [] };
+  data[dateStr].restDone = !data[dateStr].restDone;
+  save(SK.NUTRITION, data);
+  openDayView(dateStr);
 }
 
 function clearDayActivity(dateStr) {
@@ -3584,8 +3696,19 @@ function openAddReminderModal(prefillText = '', prefillTime = '17:00') {
         <input class="input" id="rem_time" type="time" value="${prefillTime}">
       </div>
       <div class="input-group">
-        <label class="input-label">Wochentage (leer = täglich)</label>
-        <div style="display:flex;gap:6px;margin-top:6px">${dowChips([], 'rem_days')}</div>
+        <label class="input-label">Zeitplan</label>
+        <div style="display:flex;gap:4px;background:var(--card);border-radius:10px;padding:3px;margin-bottom:8px">
+          ${schedModeBtn('daily','Täglich','rem',true)}
+          ${schedModeBtn('weekdays','Wochentage','rem',false)}
+          ${schedModeBtn('rhythm','Rhythmus','rem',false)}
+        </div>
+        <div id="rem_daily"></div>
+        <div id="rem_weekdays" style="display:none">
+          <div style="display:flex;gap:6px">${dowChips([],'rem_days')}</div>
+        </div>
+        <div id="rem_rhythm" style="display:none">
+          ${rhythmBuilderHtml('rem_rhythm_pat','rem_rhythm_start')}
+        </div>
       </div>
       <button class="btn btn-primary btn-full" onclick="saveReminder()">Speichern</button>
     </div>`, t('reminder_title'));
@@ -3595,14 +3718,15 @@ function saveReminder(extraData = {}) {
   const text = document.getElementById('rem_text')?.value.trim();
   const time = document.getElementById('rem_time')?.value;
   if (!text || !time) { showToast('Text und Uhrzeit eingeben'); return; }
-  const days = getSelectedDows('rem_days');
+  const remMode = document.querySelector('[data-schedmode="rem"][style*="var(--accent)"]')?.dataset.mode || 'daily';
+  const days = remMode==='weekdays' ? getSelectedDows('rem_days') : [];
+  const rhythmPattern = remMode==='rhythm' ? getRhythmPattern('rem_rhythm_pat') : null;
+  const rhythmStart   = remMode==='rhythm' ? (document.getElementById('rem_rhythm_start')?.value||todayStr()) : null;
   const rems = getReminders();
-  rems.push({ id: uid(), text, time, days, enabled: true, ...extraData });
+  rems.push({ id:uid(), text, time, days, rhythmPattern, rhythmStart, enabled:true, ...extraData });
   save(SK.REMINDERS, rems);
-  if (Notification?.permission === 'default') Notification.requestPermission().catch(()=>{});
-  closeOverlay();
-  openSettings();
-  showToast(t('reminder_saved'));
+  if (Notification?.permission==='default') Notification.requestPermission().catch(()=>{});
+  closeOverlay(); openSettings(); showToast(t('reminder_saved'));
 }
 
 function deleteReminder(id) {
@@ -3623,10 +3747,12 @@ function checkReminders() {
   const current = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
   if (state._lastReminderMinute === current) return;
   state._lastReminderMinute = current;
-  const currentDay = now.getDay(); // 0=So,1=Mo,...,6=Sa
+  const currentDay = now.getDay();
+  const today = todayStr();
   reminders.forEach(r => {
     if (r.time !== current) return;
-    if (r.days?.length && !r.days.includes(currentDay)) return; // wrong day
+    if (r.rhythmPattern?.length && !isRhythmActive(r.rhythmPattern, r.rhythmStart||today, today)) return;
+    if (!r.rhythmPattern?.length && r.days?.length && !r.days.includes(currentDay)) return;
     if (Notification?.permission === 'granted') {
       try { new Notification('FitTrack', { body: r.text, icon: './icon.svg' }); } catch {}
     } else {
